@@ -60,10 +60,9 @@ setup(
         'six>=1.15.0',
         'jsonschema>=3.2.0'
     ],
-    setup_requires=['pytest-runner'],
     entry_points={'console_scripts': ['iocage = iocage_lib:cli']},
     data_files=_data,
-    tests_require=['pytest', 'pytest-cov', 'pytest-pep8']
+    tests_require=['pytest', 'pytest-cov', 'pytest-pep8', 'pytest-runner']
 )
 
 setup(

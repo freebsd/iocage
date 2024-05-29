@@ -912,6 +912,10 @@ class IOCConfiguration:
         if not conf.get('allow_mount_fdescfs'):
             conf['allow_mount_fdescfs'] = 0
 
+        # Version 30 key
+        if not conf.get('allow_mount_linprocfs'):
+            conf['allow_mount_linprocfs'] = 0
+
         if not default:
             conf.update(jail_conf)
 
@@ -1343,6 +1347,7 @@ class IOCJson(IOCConfiguration):
         'allow_mount_fusefs',
         'allow_mount_devfs',
         'allow_mount_fdescfs',
+        'allow_mount_linprocfs',
         'allow_mount',
         'allow_mlock',
         'allow_chflags',

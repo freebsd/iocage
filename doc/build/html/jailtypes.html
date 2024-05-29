@@ -1,17 +1,20 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Jail Types &#8212; iocage 1.2 RC documentation</title>
-    <link rel="stylesheet" href="_static/agogo.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Jail Types &#8212; iocage 1.4 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/agogo.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Best Practices" href="best-practices.html" />
@@ -20,7 +23,7 @@
     <div class="header-wrapper" role="banner">
       <div class="header">
         <div class="headertitle"><a
-          href="index.html">iocage 1.2 RC documentation</a></div>
+          href="index.html">iocage 1.4 documentation</a></div>
         <div class="rel" role="navigation" aria-label="related navigation">
           <a href="networking.html" title="Networking"
              accesskey="P">previous</a> |
@@ -42,8 +45,8 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="jail-types">
-<span id="index-0"></span><span id="id1"></span><h1>Jail Types<a class="headerlink" href="#jail-types" title="Permalink to this headline">¶</a></h1>
+  <section id="jail-types">
+<span id="index-0"></span><span id="id1"></span><h1>Jail Types<a class="headerlink" href="#jail-types" title="Permalink to this heading">¶</a></h1>
 <p>iocage supports several different jail types:</p>
 <ul class="simple">
 <li><p>Clone (default)</p></li>
@@ -55,16 +58,16 @@
 <p>All jail types have specific benefits and drawbacks, serving a variety
 of unique needs. This section describes and has creation examples for
 each of these jail types.</p>
-<div class="section" id="clone-default">
-<span id="clone"></span><span id="index-1"></span><h2>Clone (default)<a class="headerlink" href="#clone-default" title="Permalink to this headline">¶</a></h2>
+<section id="clone-default">
+<span id="clone"></span><span id="index-1"></span><h2>Clone (default)<a class="headerlink" href="#clone-default" title="Permalink to this heading">¶</a></h2>
 <p>Clone jails are created with:</p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">create</span> <span class="pre">-r</span> <span class="pre">11.0-RELEASE</span></code></p>
 <p>Clone jails are duplicated from the appropriate RELEASE at creation
 time. These consume a small amount of space, preserving only the
 changing data.</p>
-</div>
-<div class="section" id="basejail">
-<span id="index-2"></span><span id="id2"></span><h2>Basejail<a class="headerlink" href="#basejail" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="basejail">
+<span id="index-2"></span><span id="id2"></span><h2>Basejail<a class="headerlink" href="#basejail" title="Permalink to this heading">¶</a></h2>
 <p>The original basejail concept was based on nullfs mounts. It was
 popularized by <a class="reference external" href="http://erdgeist.org/arts/software/ezjail/">ezjail</a>,
 but <strong class="command">iocage</strong> basejails are a little different. Basejails in
@@ -75,9 +78,9 @@ jail startup.</p>
 <p>Basejails mount their <strong>fstab</strong> mounts at each startup. They are ideal
 for environments where immediate patching or upgrading of multiple
 jails is required.</p>
-</div>
-<div class="section" id="template">
-<span id="index-3"></span><span id="id3"></span><h2>Template<a class="headerlink" href="#template" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="template">
+<span id="index-3"></span><span id="id3"></span><h2>Template<a class="headerlink" href="#template" title="Permalink to this heading">¶</a></h2>
 <p>Template jails are customized jails used to quickly create further
 custom jails.</p>
 <p>For example, after creating a jail, the user customizes
@@ -90,31 +93,33 @@ the jail into a template with:</p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">create</span> <span class="pre">-t</span> <span class="pre">examplejail</span> <span class="pre">-n</span> <span class="pre">newexamplejail</span></code></p>
 <p>Template jails are convertable by setting the <em>template=</em>
 property.</p>
-</div>
-<div class="section" id="empty">
-<span id="index-4"></span><span id="id4"></span><h2>Empty<a class="headerlink" href="#empty" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="empty">
+<span id="index-4"></span><span id="id4"></span><h2>Empty<a class="headerlink" href="#empty" title="Permalink to this heading">¶</a></h2>
 <p>Empty jails are intended for unsupported jail setups or testing. Create
 an empty jail with <strong class="command">iocage create -e</strong>.</p>
 <p>These are ideal for experimentation with unsupported RELEASES or Linux
 jails.</p>
-</div>
-<div class="section" id="thickjail">
-<span id="thick"></span><span id="index-5"></span><h2>Thickjail<a class="headerlink" href="#thickjail" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="thickjail">
+<span id="thick"></span><span id="index-5"></span><h2>Thickjail<a class="headerlink" href="#thickjail" title="Permalink to this heading">¶</a></h2>
 <p>Thickjails jails are created with:</p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">create</span> <span class="pre">-T</span> <span class="pre">-r</span> <span class="pre">11.2-RELEASE</span></code></p>
 <p>Thickjails are copied from the appropriate RELEASE at creation
 time. These consume a large amount of space, but are fully independent.</p>
 <p>These are ideal for transmission or synchronization between different
 hosts with <strong class="command">zfs send</strong> and <strong class="command">zfs receive</strong>.</p>
-</div>
-</div>
+</section>
+</section>
 
 
+            <div class="clearer"></div>
           </div>
         </div>
       </div>
         </div>
         <div class="sidebar">
+          
           <h3>Table of Contents</h3>
           <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Install iocage</a></li>
@@ -132,7 +137,7 @@ hosts with <strong class="command">zfs send</strong> and <strong class="command"
 <li class="toctree-l1"><a class="reference internal" href="best-practices.html">Best Practices</a></li>
 <li class="toctree-l1"><a class="reference internal" href="advanced-use.html">Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="templates.html">Using Templates</a></li>
-<li class="toctree-l1"><a class="reference internal" href="debian.html">Create a Debian Squeeze Jail (GNU/kFreeBSD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="debian.html">Create a Debian Buster Jail (native Linux)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="known-issues.html">Known Issues</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
 </ul>
@@ -144,6 +149,7 @@ hosts with <strong class="command">zfs send</strong> and <strong class="command"
                 <input type="submit" value="Go" />
             </form>
           </div>
+
         </div>
         <div class="clearer"></div>
       </div>

@@ -1,17 +1,20 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Create a Debian Squeeze Jail (GNU/kFreeBSD) &#8212; iocage 1.2 RC documentation</title>
-    <link rel="stylesheet" href="_static/agogo.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Create a Debian Buster Jail (native Linux) &#8212; iocage 1.4 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/agogo.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Known Issues" href="known-issues.html" />
@@ -20,7 +23,7 @@
     <div class="header-wrapper" role="banner">
       <div class="header">
         <div class="headertitle"><a
-          href="index.html">iocage 1.2 RC documentation</a></div>
+          href="index.html">iocage 1.4 documentation</a></div>
         <div class="rel" role="navigation" aria-label="related navigation">
           <a href="templates.html" title="Using Templates"
              accesskey="P">previous</a> |
@@ -42,11 +45,10 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="create-a-debian-squeeze-jail-gnu-kfreebsd">
-<span id="create-a-debian-squeeze-jail"></span><span id="index-0"></span><h1>Create a Debian Squeeze Jail (GNU/kFreeBSD)<a class="headerlink" href="#create-a-debian-squeeze-jail-gnu-kfreebsd" title="Permalink to this headline">¶</a></h1>
-<p>This section shows the process to set up a Debian (GNU/kFreeBSD) jail.
-GNU/kFreeBSD is a Debian userland tailored for the FreeBSD kernel.</p>
-<p>The examples in this section use a jail with the custom name
+  <section id="create-a-debian-buster-jail-native-linux">
+<span id="create-a-debian-jail"></span><span id="index-0"></span><h1>Create a Debian Buster Jail (native Linux)<a class="headerlink" href="#create-a-debian-buster-jail-native-linux" title="Permalink to this heading">¶</a></h1>
+<p>This section shows the process to set up a Debian Linux jail.
+The examples in this section use a jail with the custom name
 <strong>debjail</strong>. Remember to replace <strong>debjail</strong> with your jail’s UUID or
 NAME!</p>
 <div class="admonition warning">
@@ -54,39 +56,46 @@ NAME!</p>
 <p>This is not recommended for production use. The intention
 is to show <strong class="command">iocage</strong> can do almost anything with jails.</p>
 </div>
-<p><strong>Create an empty jail with Linux specifics:</strong></p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># iocage create -e -n debjail exec_start=&quot;/etc/init.d/rc 3&quot; exec_stop=&quot;/etc/init.d/rc 0&quot;
+<p><strong>Create an empty jail:</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># iocage create -e -n debjail exec_start=&quot;/bin/true&quot; exec_stop=&quot;/bin/true&quot;
 </pre></div>
 </div>
 <p><strong>Install debootstrap on the host:</strong></p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">pkg</span> <span class="pre">install</span> <span class="pre">debootstrap</span></code></p>
+<p><strong>Enable linux(4):</strong></p>
+<p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">sysrc</span> <span class="pre">linux_enable=&quot;YES&quot;</span></code>
+<code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">sysrc</span> <span class="pre">linux_mounts_enable=&quot;NO&quot;</span></code>
+<code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">service</span> <span class="pre">linux</span> <span class="pre">start</span></code></p>
 <p><strong>Grab the mountpoint for the empty jail, append /root/ to it, and run</strong>
-<strong>`debootstrap &lt;https://www.freebsd.org/cgi/man.cgi?query=debootstrap&gt;`_:</strong></p>
+<strong>debootstrap(8):</strong></p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">get</span> <span class="pre">mountpoint</span> <span class="pre">debjail</span></code></p>
-<p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">debootstrap</span> <span class="pre">squeeze</span> <span class="pre">/iocage/jails/debjail/root/</span></code></p>
-<p>Replace <em>squeeze</em> with <em>wheezy</em>, if needed.</p>
+<p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">debootstrap</span> <span class="pre">buster</span> <span class="pre">/iocage/jails/debjail/root/</span></code></p>
+<p>Apart from Debian releases, like <em>buster</em> or <em>testing</em>, you can
+also use Ubuntu releases, eg <em>bionic</em>.</p>
 <p><strong>Add lines to the jail</strong> <code class="file docutils literal notranslate"><span class="pre">fstab</span></code> <strong>file:</strong></p>
 <p>Use <strong class="command">iocage fstab -e [UUID | NAME]</strong> to edit the <code class="file docutils literal notranslate"><span class="pre">fstab</span></code>
 file of <em>debjail</em> directly. Add these lines to the file:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>linsys   /iocage/jails/debjail/root/sys         linsysfs  rw          0 0
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>devfs    /iocage/jails/debjail/root/dev         devfs     rw          0 0
+tmpfs    /iocage/jails/debjail/root/dev/shm     tmpfs     rw,size=1g,mode=1777 0 0
+fdescfs  /iocage/jails/debjail/root/dev/fd      fdescfs   rw,linrdlnk 0 0
 linproc  /iocage/jails/debjail/root/proc        linprocfs rw          0 0
-tmpfs    /iocage/jails/debjail/root/lib/init/rw tmpfs     rw,mode=777 0 0
+linsys   /iocage/jails/debjail/root/sys         linsysfs  rw          0 0
 </pre></div>
 </div>
 <p><strong>Start the jail and attach to it:</strong></p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">start</span> <span class="pre">debjail</span></code></p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">console</span> <span class="pre">debjail</span></code></p>
-<p>The result is a 64bit Debian Linux userland.</p>
-<p>To install a Linux only Debian jail, follow this tutorial:
-<a class="reference external" href="http://devil-detail.blogspot.co.nz/2013/08/debian-linux-freebsd-jail-zfs.html">debian-linux-freebsd-jail-zfs</a></p>
-</div>
+<p>The result is a 64-bit Debian Linux userland.</p>
+</section>
 
 
+            <div class="clearer"></div>
           </div>
         </div>
       </div>
         </div>
         <div class="sidebar">
+          
           <h3>Table of Contents</h3>
           <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Install iocage</a></li>
@@ -97,7 +106,7 @@ tmpfs    /iocage/jails/debjail/root/lib/init/rw tmpfs     rw,mode=777 0 0
 <li class="toctree-l1"><a class="reference internal" href="best-practices.html">Best Practices</a></li>
 <li class="toctree-l1"><a class="reference internal" href="advanced-use.html">Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="templates.html">Using Templates</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Create a Debian Squeeze Jail (GNU/kFreeBSD)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Create a Debian Buster Jail (native Linux)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="known-issues.html">Known Issues</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
 </ul>
@@ -109,6 +118,7 @@ tmpfs    /iocage/jails/debjail/root/lib/init/rw tmpfs     rw,mode=777 0 0
                 <input type="submit" value="Go" />
             </form>
           </div>
+
         </div>
         <div class="clearer"></div>
       </div>

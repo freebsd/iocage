@@ -1,12 +1,12 @@
 # iocage
 
-[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/iocage/iocage.svg)](http://isitmaintained.com/project/iocage/iocage "Average time to resolve an issue")
-[![Percentage of issues still open](http://isitmaintained.com/badge/open/iocage/iocage.svg)](http://isitmaintained.com/project/iocage/iocage "Percentage of issues still open")
+[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/freebsd/iocage.svg)](http://isitmaintained.com/project/freebsd/iocage "Average time to resolve an issue")
+[![Percentage of issues still open](http://isitmaintained.com/badge/open/freebsd/iocage.svg)](http://isitmaintained.com/project/freebsd/iocage "Percentage of issues still open")
 ![Python Version](https://img.shields.io/badge/Python-3.9-blue.svg)
-[![GitHub issues](https://img.shields.io/github/issues/iocage/iocage.svg)](https://github.com/iocage/iocage/issues)
-[![GitHub forks](https://img.shields.io/github/forks/iocage/iocage.svg)](https://github.com/iocage/iocage/network)
-[![GitHub stars](https://img.shields.io/github/stars/iocage/iocage.svg)](https://github.com/iocage/iocage/stargazers)
-[![Twitter](https://img.shields.io/twitter/url/https/github.com/iocage/iocage.svg?style=social)](https://twitter.com/intent/tweet?text=@iocage)
+[![GitHub issues](https://img.shields.io/github/issues/freebsd/iocage.svg)](https://github.com/freebsd/iocage/issues)
+[![GitHub forks](https://img.shields.io/github/forks/freebsd/iocage.svg)](https://github.com/freebsd/iocage/network)
+[![GitHub stars](https://img.shields.io/github/stars/freebsd/iocage.svg)](https://github.com/freebsd/iocage/stargazers)
+[![Twitter](https://img.shields.io/twitter/url/https/github.com/freebsd/iocage.svg?style=social)](https://twitter.com/intent/tweet?text=@iocage)
 
 ## A FreeBSD jail manager
 
@@ -24,7 +24,7 @@ To install using binary packages, simply run: `pkg install py39-iocage`
 The FreeBSD source tree ***must*** be located at `$SRC_BASE` (`/usr/src` by default) to build from git.
 
 - `pkg install python39 git-lite py39-cython py39-libzfs py39-pip`
-- `git clone https://github.com/iocage/iocage`
+- `git clone https://github.com/freebsd/iocage`
 - `make install` as root
 
 To install subsequent updates: run `make install` as root.
@@ -59,7 +59,7 @@ This repository replaces `iocage_legacy`. To upgrade to the current version:
 
 ## Raising an issue:
 
-We _like_ issues! If you are having trouble with `iocage` please open a GitHub [issue](https://github.com/iocage/iocage/issues) and we will ~~run around with our hair on fire~~ look into it. Before doing so, please give us some information about the situation:
+We _like_ issues! If you are having trouble with `iocage` please open a GitHub [issue](https://github.com/freebsd/iocage/issues) and we will ~~run around with our hair on fire~~ look into it. Before doing so, please give us some information about the situation:
 
 - Tell us what version of FreeBSD you are using with something like `uname -ro`
 - It would also be helpful if you gave us the output of `iocage --version`

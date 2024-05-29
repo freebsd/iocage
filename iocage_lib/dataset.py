@@ -88,7 +88,7 @@ class Dataset(Resource):
 
     @property
     def locked(self):
-        return not self.mounted or (
+        return (
             self.properties.get('encryption', 'off') != 'off'
             and self.properties.get('keystatus', 'available') != 'available'
         )

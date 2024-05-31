@@ -434,7 +434,7 @@ class IOCConfiguration:
     @staticmethod
     def get_version():
         """Sets the iocage configuration version."""
-        version = '30'
+        version = '31'
 
         return version
 
@@ -916,6 +916,10 @@ class IOCConfiguration:
         if not conf.get('allow_mount_linprocfs'):
             conf['allow_mount_linprocfs'] = 0
 
+        # Version 31 key
+        if not conf.get('allow_nfsd'):
+            conf['allow_nfsd'] = 0
+
         if not default:
             conf.update(jail_conf)
 
@@ -1183,6 +1187,7 @@ class IOCConfiguration:
             'allow_socket_af': 0,
             'allow_tun': 0,
             'allow_vmm': 0,
+            'allow_nfsd': 0,
             'cpuset': 'off',
             'rlimits': 'off',
             'memoryuse': 'off',
@@ -1354,6 +1359,7 @@ class IOCJson(IOCConfiguration):
         'allow_raw_sockets',
         'allow_sysvipc',
         'allow_set_hostname',
+        'allow_nfsd',
         'mount_fdescfs',
         'mount_devfs',
         'ip6_saddrsel',
@@ -2105,6 +2111,7 @@ class IOCJson(IOCConfiguration):
             "allow_quotas": truth_variations,
             "allow_socket_af": truth_variations,
             "allow_vmm": truth_variations,
+            "allow_nfsd": truth_variations,
             "vnet_interfaces": ("string", ),
             # RCTL limits
             "cpuset": ('string',),

@@ -134,6 +134,7 @@ class IOCStart(object):
         allow_sysvipc = self.conf["allow_sysvipc"]
         allow_raw_sockets = self.conf["allow_raw_sockets"]
         allow_chflags = self.conf["allow_chflags"]
+        allow_nfsd = self.conf["allow_nfsd"]
         allow_mlock = self.conf["allow_mlock"]
         allow_mount = self.conf["allow_mount"]
         allow_mount_devfs = self.conf["allow_mount_devfs"]
@@ -367,6 +368,12 @@ class IOCStart(object):
             _allow_vmm = f"allow.vmm={allow_vmm}"
             _exec_created = f'exec.created={exec_created}'
 
+        # FreeBSD < 13.3 does not support nfsd in jail
+        if userland_version < 13.3:
+            _allow_nfsd = ''
+        else:
+            _allow_nfsd = f"allow.nfsd={allow_nfsd}"
+
         if nat:
             self.log.debug(f'Checking NAT backend: {nat_backend}')
             self.__check_nat__(backend=nat_backend)
@@ -545,7 +552,7 @@ class IOCStart(object):
 
         parameters = [
             fdescfs, _allow_mlock, tmpfs,
-            _allow_mount_fdescfs, _allow_mount_fusefs, _allow_vmm,
+            _allow_mount_fdescfs, _allow_mount_fusefs, _allow_vmm, _allow_nfsd,
             f"allow.set_hostname={allow_set_hostname}",
             f"mount.devfs={mount_devfs}",
             f"allow.raw_sockets={allow_raw_sockets}",

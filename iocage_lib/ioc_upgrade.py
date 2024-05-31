@@ -77,12 +77,11 @@ class IOCUpgrade:
             'PATH': path,
             'PWD': '/',
             'HOME': '/',
-            'TERM': 'xterm-256color',
-            'HTTP_PROXY': os.environ.get('HTTP_PROXY', ''),
-            'HTTPS_PROXY': os.environ.get('HTTPS_PROXY', ''),
-            'HTTP_PROXY_AUTH': os.environ.get('HTTP_PROXY_AUTH', ''),
-            'NO_PROXY': os.environ.get('NO_PROXY', '')
+            'TERM': 'xterm-256color'
         }
+        for envvar in [ 'HTTP_PROXY','HTTPS_PROXY','HTTP_PROXY_AUTH','NO_PROXY' ]:
+            if os.environ.get(envvar, '') != '':
+                upgrade_env[envvar] = os.environ.get(envvar)
 
         self.callback = callback
 

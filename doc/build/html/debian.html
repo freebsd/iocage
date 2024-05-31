@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Create a Debian Buster Jail (native Linux) &#8212; iocage 1.4 documentation</title>
+    <title>Create a Debian Buster Jail (native Linux) &#8212; iocage 1.5 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/agogo.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -23,7 +23,7 @@
     <div class="header-wrapper" role="banner">
       <div class="header">
         <div class="headertitle"><a
-          href="index.html">iocage 1.4 documentation</a></div>
+          href="index.html">iocage 1.5 documentation</a></div>
         <div class="rel" role="navigation" aria-label="related navigation">
           <a href="templates.html" title="Using Templates"
              accesskey="P">previous</a> |
@@ -58,6 +58,18 @@ is to show <strong class="command">iocage</strong> can do almost anything with j
 </div>
 <p><strong>Create an empty jail:</strong></p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span># iocage create -e -n debjail exec_start=&quot;/bin/true&quot; exec_stop=&quot;/bin/true&quot;
+  allow_mount_linprocfs=1 allow_mount_devfs=1 allow_raw_sockets=1
+  allow_socket_af=1 allow_mount=1
+</pre></div>
+</div>
+<p><strong>Install devfs rules for vnet:</strong></p>
+<p>In <cite>/etc/devfs.rules</cite>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[devfsrules_jail_linux=6] add include $devfsrules_hide_all
+add include $devfsrules_unhide_basic
+add include $devfsrules_unhide_login
+add path &#39;tun*&#39; unhide
+add path &#39;bpf*&#39; unhide
+add path zfs unhide
 </pre></div>
 </div>
 <p><strong>Install debootstrap on the host:</strong></p>
@@ -69,7 +81,7 @@ is to show <strong class="command">iocage</strong> can do almost anything with j
 <p><strong>Grab the mountpoint for the empty jail, append /root/ to it, and run</strong>
 <strong>debootstrap(8):</strong></p>
 <p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">iocage</span> <span class="pre">get</span> <span class="pre">mountpoint</span> <span class="pre">debjail</span></code></p>
-<p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">debootstrap</span> <span class="pre">buster</span> <span class="pre">/iocage/jails/debjail/root/</span></code></p>
+<p><code class="samp docutils literal notranslate"><span class="pre">#</span> <span class="pre">debootstrap</span> <span class="pre">bookworm</span> <span class="pre">/iocage/jails/debjail/root/</span></code></p>
 <p>Apart from Debian releases, like <em>buster</em> or <em>testing</em>, you can
 also use Ubuntu releases, eg <em>bionic</em>.</p>
 <p><strong>Add lines to the jail</strong> <code class="file docutils literal notranslate"><span class="pre">fstab</span></code> <strong>file:</strong></p>

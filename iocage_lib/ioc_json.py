@@ -434,7 +434,7 @@ class IOCConfiguration:
     @staticmethod
     def get_version():
         """Sets the iocage configuration version."""
-        version = '31'
+        version = '32'
 
         return version
 
@@ -920,6 +920,10 @@ class IOCConfiguration:
         if not conf.get('allow_nfsd'):
             conf['allow_nfsd'] = 0
 
+        # Version 32 key
+        if not conf.get('allow_mount_linsysfs'):
+            conf['allow_mount_linsysfs'] = 0
+
         if not default:
             conf.update(jail_conf)
 
@@ -1181,6 +1185,7 @@ class IOCConfiguration:
             'allow_mount_nullfs': 0,
             'allow_mount_procfs': 0,
             'allow_mount_linprocfs': 0,
+            'allow_mount_linsysfs': 0,
             'allow_mount_tmpfs': 0,
             'allow_mount_zfs': 0,
             'allow_quotas': 0,
@@ -1353,6 +1358,7 @@ class IOCJson(IOCConfiguration):
         'allow_mount_devfs',
         'allow_mount_fdescfs',
         'allow_mount_linprocfs',
+        'allow_mount_linsysfs',
         'allow_mount',
         'allow_mlock',
         'allow_chflags',
@@ -2106,6 +2112,7 @@ class IOCJson(IOCConfiguration):
             "allow_mount_nullfs": truth_variations,
             "allow_mount_procfs": truth_variations,
             "allow_mount_linprocfs": truth_variations,
+            "allow_mount_linsysfs": truth_variations,
             "allow_mount_tmpfs": truth_variations,
             "allow_mount_zfs": truth_variations,
             "allow_quotas": truth_variations,

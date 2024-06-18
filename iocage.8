@@ -1698,6 +1698,16 @@ Default: 0
 .Pp
 Source:
 .Xr jail 8
+.It Pf allow_mount_linsysfs= Op 1 | 0
+Privileged users inside the jail will be able to mount and
+unmount the linsysfs file system. This permission is effective
+only together with allow.mount and only when enforce_statfs is
+set to a value lower than 2.
+.Pp
+Default: 0
+.Pp
+Source:
+.Xr jail 8
 .It Pf allow_mount_tmpfs= Op 1 | 0
 Allow privileged users inside the jail to mount and unmount the tmpfs
 file system.

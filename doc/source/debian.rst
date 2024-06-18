@@ -17,6 +17,21 @@ NAME!
 .. code-block:: none
 
  # iocage create -e -n debjail exec_start="/bin/true" exec_stop="/bin/true"
+   allow_mount_linprocfs=1 allow_mount_devfs=1 allow_raw_sockets=1
+   allow_socket_af=1 allow_mount_linsysfs=1 allow_mount=1
+
+**Install devfs rules for vnet:**
+
+In `/etc/devfs.rules`:
+
+.. code-block:: none
+
+ [devfsrules_jail_linux=6] add include $devfsrules_hide_all
+ add include $devfsrules_unhide_basic
+ add include $devfsrules_unhide_login
+ add path 'tun*' unhide
+ add path 'bpf*' unhide
+ add path zfs unhide
 
 **Install debootstrap on the host:**
 
@@ -33,7 +48,7 @@ NAME!
 
 :samp:`# iocage get mountpoint debjail`
 
-:samp:`# debootstrap buster /iocage/jails/debjail/root/`
+:samp:`# debootstrap bookworm /iocage/jails/debjail/root/`
 
 Apart from Debian releases, like *buster* or *testing*, you can
 also use Ubuntu releases, eg *bionic*.

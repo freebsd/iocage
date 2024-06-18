@@ -143,6 +143,7 @@ class IOCStart(object):
         allow_mount_nullfs = self.conf["allow_mount_nullfs"]
         allow_mount_procfs = self.conf["allow_mount_procfs"]
         allow_mount_linprocfs = self.conf["allow_mount_linprocfs"]
+        allow_mount_linsysfs = self.conf["allow_mount_linsysfs"]
         allow_mount_tmpfs = self.conf["allow_mount_tmpfs"]
         allow_mount_zfs = self.conf["allow_mount_zfs"]
         allow_quotas = self.conf["allow_quotas"]
@@ -565,6 +566,7 @@ class IOCStart(object):
             f"allow.mount.nullfs={allow_mount_nullfs}",
             f"allow.mount.procfs={allow_mount_procfs}",
             f"allow.mount.linprocfs={allow_mount_linprocfs}",
+            f"allow.mount.linsysfs={allow_mount_linsysfs}",
             f"allow.mount.zfs={allow_mount_zfs}"
         ]
 

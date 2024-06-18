@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Create a Debian Buster Jail (native Linux) &#8212; iocage 1.5 documentation</title>
+    <title>Create a Debian Buster Jail (native Linux) &#8212; iocage 1.7 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/agogo.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -23,7 +23,7 @@
     <div class="header-wrapper" role="banner">
       <div class="header">
         <div class="headertitle"><a
-          href="index.html">iocage 1.5 documentation</a></div>
+          href="index.html">iocage 1.7 documentation</a></div>
         <div class="rel" role="navigation" aria-label="related navigation">
           <a href="templates.html" title="Using Templates"
              accesskey="P">previous</a> |
@@ -59,7 +59,7 @@ is to show <strong class="command">iocage</strong> can do almost anything with j
 <p><strong>Create an empty jail:</strong></p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span># iocage create -e -n debjail exec_start=&quot;/bin/true&quot; exec_stop=&quot;/bin/true&quot;
   allow_mount_linprocfs=1 allow_mount_devfs=1 allow_raw_sockets=1
-  allow_socket_af=1 allow_mount=1
+  allow_socket_af=1 allow_mount_linsysfs=1 allow_mount=1
 </pre></div>
 </div>
 <p><strong>Install devfs rules for vnet:</strong></p>

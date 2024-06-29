@@ -1,5 +1,3 @@
-import six
-
 from ctypes import CDLL
 from ctypes.util import find_library
 
@@ -20,6 +18,6 @@ def load_ctypes_library(name, signatures):
 
 
 def ensure_unicode_str(value):
-    if not isinstance(value, six.text_type):
+    if not isinstance(value, str):
         value = value.decode()
     return value

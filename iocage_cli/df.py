@@ -60,10 +60,10 @@ def cli(header, _long, _sort):
     jail_list.sort(key=sort)
 
     if header:
-        jail_list.insert(0, ["NAME", "CRT", "RES", "QTA", "USE", "AVA"])
+        table.header(["NAME", "CRT", "RES", "QTA", "USE", "AVA"])
         # We get an infinite float otherwise.
         table.set_cols_dtype(["t", "t", "t", "t", "t", "t"])
-        table.add_rows(jail_list)
+        table.add_rows(jail_list, header=False)
 
         ioc_common.logit({"level": "INFO", "message": table.draw()})
     else:

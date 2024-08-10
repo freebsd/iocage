@@ -178,9 +178,8 @@ class IOCList(object):
 
         # We get an infinite float otherwise.
         table.set_cols_dtype(["t", "t"])
-        jail_list.insert(0, ["NAME", "IP4"])
-
-        table.add_rows(jail_list)
+        table.header(["NAME", "IP4"])
+        table.add_rows(jail_list, header=False)
 
         return table.draw()
 
@@ -443,23 +442,21 @@ class IOCList(object):
                 table.set_cols_dtype(["t", "t", "t", "t", "t", "t", "t", "t",
                                       "t", "t", "t"])
 
-                jail_list.insert(0, ["JID", "NAME", "BOOT", "STATE", "TYPE",
-                                     "RELEASE", "IP4", "IP6", "TEMPLATE",
-                                     "PORTAL", "DOC_URL"])
+                table.header(["JID", "NAME", "BOOT", "STATE", "TYPE", "RELEASE",
+                              "IP4", "IP6", "TEMPLATE", "PORTAL", "DOC_URL"])
             else:
                 # We get an infinite float otherwise.
                 table.set_cols_dtype(["t", "t", "t", "t", "t", "t", "t", "t",
                                       "t", "t"])
 
-                jail_list.insert(0, ["JID", "NAME", "BOOT", "STATE", "TYPE",
-                                     "RELEASE", "IP4", "IP6", "TEMPLATE",
-                                     'BASEJAIL'])
+                table.header(["JID", "NAME", "BOOT", "STATE", "TYPE", "RELEASE",
+                              "IP4", "IP6", "TEMPLATE", 'BASEJAIL'])
         else:
             # We get an infinite float otherwise.
             table.set_cols_dtype(["t", "t", "t", "t", "t"])
-            jail_list.insert(0, ["JID", "NAME", "STATE", "RELEASE", "IP4"])
+            table.header(["JID", "NAME", "STATE", "RELEASE", "IP4"])
 
-        table.add_rows(jail_list)
+        table.add_rows(jail_list, header=False)
 
         return table.draw()
 
@@ -474,8 +471,8 @@ class IOCList(object):
 
             return flat_base
 
-        base_list.insert(0, ["Bases fetched"])
-        table.add_rows(base_list)
+        table.header(["Bases fetched"])
+        table.add_rows(base_list, header=False)
         # We get an infinite float otherwise.
         table.set_cols_dtype(["t"])
 

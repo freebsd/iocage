@@ -276,6 +276,7 @@ class ZFS:
     # TODO: Improve how we manage zfs object here
     pool = None
     pool_mountpoint = None
+    prefix = None
 
     def __init__(self):
         pass
@@ -297,6 +298,7 @@ class ZFS:
 
                     ZFS.pool = pools[0].name
                     ZFS.pool_mountpoint = pools[0].root_dataset.mountpoint
+                    ZFS.prefix = pools[0].root_dataset.__getstate__().get('properties').get('org.freebsd.ioc:prefix', {}).get('value', '')
 
     @staticmethod
     def get(identifier):
@@ -350,15 +352,15 @@ class ZFS:
 
     @property
     def iocage_dataset(self):
-        return self.get_dataset(f'{self.pool}/iocage')
+        return self.get_dataset(os.path.join(self.pool, self.prefix, 'iocage'))
 
     @property
     def releases_dataset(self):
-        return self.get_dataset(f'{self.pool}/iocage/releases')
+        return self.get_dataset(os.path.join(self.pool, self.prefix, 'iocage/releases'))
 
     @property
     def images_dataset_path(self):
-        return os.path.join(ZFS.pool_mountpoint, 'iocage/images')
+        return os.path.join(ZFS.pool_mountpoint, ZFS.prefix, 'iocage/images')
 
 
 class Resource:
@@ -507,13 +509,12 @@ class Jail(Resource):
     @property
     def path(self):
         # Jail can be either under `jails` or `templates` datasets
-        if self.zfs.get_dataset(
-            f'{self.zfs.pool}/iocage/jails/{self.name}'
+        if self.zfs.get_dataset(os.path.join(self.zfs.pool, self.zfs.prefix, 'iocage/jails', self.name)
         ):
             dataset = 'jails'
         else:
             dataset = 'templates'
-        return f'{self.zfs.pool}/iocage/{dataset}/{self.name}'
+        return os.path.join(self.zfs.pool, self.zfs.prefix, 'iocage', dataset, self.name)
 
     @property
     def absolute_path(self):

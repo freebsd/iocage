@@ -45,7 +45,11 @@ iocage_tests_task:
     - pkg
   install_iocage_script:
     - python3 setup.py install
-  test_script: pytest --zpool=pool tests/functional_tests --junit-xml=reports/pytest-report.xml -rA --image
+  matrix:
+    - name: No prefix
+      test_script: pytest -rA --zpool=pool tests/functional_tests --junit-xml=reports/pytest-report.xml --image
+    - name: Custom prefix
+      test_script: pytest -rA --zpool=pool --prefix=test-prefix tests/functional_tests --junit-xml=reports/pytest-report.xml --image
   always:
     pytest_results_artifacts:
       path: reports/*.xml

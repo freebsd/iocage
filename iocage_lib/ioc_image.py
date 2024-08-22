@@ -34,6 +34,7 @@ import iocage_lib.ioc_common
 import iocage_lib.ioc_json
 
 from iocage_lib.cache import cache
+from iocage_lib.pools import Pool
 
 
 class IOCImage(object):
@@ -41,6 +42,7 @@ class IOCImage(object):
 
     def __init__(self, callback=None, silent=False):
         self.pool = iocage_lib.ioc_json.IOCJson().json_get_value("pool")
+        self.zpool = Pool(self.pool)
         self.iocroot = iocage_lib.ioc_json.IOCJson(
             self.pool).json_get_value("iocroot")
         self.date = datetime.datetime.utcnow().strftime("%F")
@@ -53,7 +55,10 @@ class IOCImage(object):
         name = f"{uuid}_{self.date}"
         image = f"{images}/{name}"
         export_type, jail_name = path.rsplit('/', 2)[-2:]
-        image_path = f"{self.pool}/iocage/{export_type}/{jail_name}"
+        image_path = os.path.join(
+            self.zpool.name, self.zpool.prefix, 'iocage',
+            export_type, jail_name
+        )
         jail_list = []
         extension = 'zip' if compression_algo == 'zip' else 'tar.xz'
 
@@ -153,7 +158,10 @@ class IOCImage(object):
 
         # Cleanup our mess.
         try:
-            target = f"{self.pool}/iocage/jails/{uuid}@ioc-export-{self.date}"
+            target = os.path.join(
+                self.zpool.name, self.zpool.prefix, 'iocage',
+                'jails', f"{uuid}@ioc-export-{self.date}"
+            )
             iocage_lib.ioc_common.checkoutput(
                 ["zfs", "destroy", "-r", target], stderr=su.STDOUT)
 
@@ -280,7 +288,8 @@ class IOCImage(object):
                 recv = su.Popen(
                     [
                         'zfs', 'recv', '-F', os.path.join(
-                            self.pool, 'iocage/jails', z_dataset_type
+                            self.zpool.name, self.zpool.prefix, 'iocage',
+                            'jails', z_dataset_type
                         )
                     ], stdin=su.PIPE
                 )
@@ -297,7 +306,10 @@ class IOCImage(object):
 
         # Cleanup our mess.
         try:
-            target = f"{self.pool}/iocage/jails/{uuid}@ioc-export-{date}"
+            target = os.path.join(
+                self.zpool.name, self.zpool.prefix, 'iocage',
+                'jails', f"{uuid}@ioc-export-{date}"
+            )
 
             iocage_lib.ioc_common.checkoutput(
                 ["zfs", "destroy", "-r", target], stderr=su.STDOUT)

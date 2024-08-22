@@ -45,7 +45,7 @@ class IOCDestroy:
         self.callback = callback
         self.iocroot_datasets = [
             d.name for d in
-            Dataset(os.path.join(self.pool, 'iocage')).get_dependents()
+            Dataset(self.iocroot).get_dependents()
         ]
         self.path = None
         self.j_conf = None
@@ -137,7 +137,7 @@ class IOCDestroy:
                 release = self.j_conf['release']
 
             release_snap = Snapshot(
-                f'{self.pool}/iocage/releases/{release}/root@{uuid}'
+                f'{self.iocroot}/releases/{release}/root@{uuid}'
             )
 
             if release_snap.exists:
@@ -146,7 +146,7 @@ class IOCDestroy:
                 try:
                     temp = self.j_conf['source_template']
                     temp_snap = Snapshot(
-                        f'{self.pool}/iocage/templates/{temp}@{uuid}'
+                        f'{self.iocroot}/templates/{temp}@{uuid}'
                     )
 
                     if temp_snap.exists:
@@ -182,7 +182,7 @@ class IOCDestroy:
                 uuid = dataset.rsplit('/', 1)[1]
 
             jail_datasets = Dataset(
-                f'{self.pool}/iocage/jails'
+                f'{self.iocroot}/jails'
             ).get_dependents()
             for jail in jail_datasets:
                 with iocage_lib.ioc_exceptions.ignore_exceptions(
@@ -278,7 +278,7 @@ class IOCDestroy:
 
         try:
             self.__destroy_parse_datasets__(
-                f"{self.pool}/iocage/{dataset_type}/{uuid}")
+                f"{self.iocroot}/{dataset_type}/{uuid}")
         except SystemExit:
             # The dataset doesn't exist, we don't care :)
             pass

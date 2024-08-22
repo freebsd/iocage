@@ -31,11 +31,16 @@ require_zpool = pytest.mark.require_zpool
 
 @require_root
 @require_zpool
-def test_activate(zpool, invoke_cli, zfs):
+def test_activate(zpool, prefix, invoke_cli, zfs):
+    args = [zpool]
+    if prefix != '':
+        args.extend(['-p', prefix])
     invoke_cli(
-        ['activate', zpool]
+        ['activate', *args]
     )
 
     zfs.set_pool()
 
     assert zfs.pool == zpool, f'Failed to activate {zpool}'
+    if prefix != '':
+        assert zfs.prefix == prefix, f'Failed to set prefix {prefix}'

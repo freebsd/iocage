@@ -66,12 +66,12 @@ class IOCList(object):
     def list_datasets(self):
         """Lists the datasets of given type."""
         if self.list_type == "base":
-            ds = Dataset(f"{self.pool}/iocage/releases").get_dependents()
+            ds = Dataset(f"{self.iocroot}/releases").get_dependents()
         elif self.list_type == "template":
             ds = Dataset(
-                f"{self.pool}/iocage/templates").get_dependents()
+                f"{self.iocroot}/templates").get_dependents()
         else:
-            ds = Dataset(f"{self.pool}/iocage/jails").get_dependents()
+            ds = Dataset(f"{self.iocroot}/jails").get_dependents()
 
         ds = list(ds)
 
@@ -101,7 +101,7 @@ class IOCList(object):
                     )
 
             template_datasets = Dataset(
-                f'{self.pool}/iocage/templates').get_dependents()
+                f'{self.iocroot}/templates').get_dependents()
 
             for template in template_datasets:
                 uuid = template.name.rsplit("/", 1)[-1]

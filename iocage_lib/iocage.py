@@ -1648,8 +1648,22 @@ class IOCage:
             rtsold_enable = "YES" if "accept_rtadv" in value else "NO"
             ioc_common.set_rcconf(path, "rtsold_enable", rtsold_enable)
 
+    def snap_list_all(self, long, _sort):
+        self._all = False
+        snap_list = []
+        for jail in self.jails:
+            self.jail = jail
+            snap_list.extend(
+                [[jail, *snap] for snap in self.snap_list(long, _sort)]
+                )
+        sort = ioc_common.ioc_sort("snaplist", _sort, data=snap_list)
+        snap_list.sort(key=sort)
+        return snap_list
+
     def snap_list(self, long=True, _sort="created"):
         """Gathers a list of snapshots and returns it"""
+        if self._all:
+          return self.snap_list_all(long=long, _sort=_sort)
         uuid, path = self.__check_jail_existence__()
         conf = ioc_json.IOCJson(path, silent=self.silent).json_get_value('all')
         snap_list = []
@@ -1709,8 +1723,20 @@ class IOCage:
 
         return snap_list
 
+    def snapshot_all(self, name):
+        # We want a consistent name across a snapshot batch.
+        if not name:
+            name = datetime.datetime.utcnow().strftime("%F_%T")
+        self._all = False
+        for jail in self.jails:
+            self.jail = jail
+            self.snapshot(name)
+
     def snapshot(self, name):
         """Will create a snapshot for the given jail"""
+        if self._all:
+            self.snapshot_all(name)
+            return
         date = datetime.datetime.utcnow().strftime("%F_%T")
         uuid, path = self.__check_jail_existence__()
 
@@ -2160,8 +2186,44 @@ Remove the snapshot: ioc_upgrade_{_date} if everything is OK
 
         ioc_debug.IOCDebug(directory).run_debug()
 
-    def snap_remove(self, snapshot):
+    def _get_cloned_datasets(self):
+        return {
+                    d.properties.get('origin', "").replace('/root@', '@')
+                    for d in Dataset(
+                        os.path.join(self.pool, 'iocage')
+                    ).get_dependents(depth=3)
+                }
+
+    def snap_remove_all(self, snapshot):
+        self._all = False
+        cloned_datasets=self._get_cloned_datasets()
+        
+        for jail in self.jails:
+            self.jail = jail
+            self.snap_remove(snapshot, cloned_datasets=cloned_datasets)
+
+    def snap_remove(self, snapshot, cloned_datasets=None):
         """Removes user supplied snapshot from jail"""
+        if self._all:
+            self.snap_remove_all(snapshot)
+            return
+        if snapshot == 'ALL':
+            if cloned_datasets is None:
+                cloned_datasets = self._get_cloned_datasets()
+            for snapshot, *_ in reversed(self.snap_list()):
+                if snapshot in cloned_datasets:
+                    ioc_common.logit({
+                                    'level': 'WARNING',
+                                    'message': f"Skipped snapshot {snapshot}: used by clones."
+                    })
+                elif snapshot.rsplit('@', 1)[0].endswith('/root'):
+                    # Deleting here would result in trying to delete
+                    # the jail dataset-level snapshot twice since we construct
+                    # the target based on the uuid, not path, below.
+                    continue
+                else:
+                    self.snap_remove(snapshot.rsplit('@', 1)[-1])
+            return
         uuid, path = self.__check_jail_existence__()
         conf = ioc_json.IOCJson(path, silent=self.silent).json_get_value('all')
 

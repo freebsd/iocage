@@ -37,7 +37,10 @@ def common_function(
     jails_as_rows, full=False
 ):
     for flag in SORTING_FLAGS:
-        command = ['snaplist', jail.name, '-s', flag]
+        if type(jail) is list:
+            command = ['snaplist', 'ALL', '-s', flag]
+        else:
+            command = ['snaplist', jail.name, '-s', flag]
         if full:
             command.append('-l')
 
@@ -45,8 +48,17 @@ def common_function(
             command
         )
 
-        orig_list = parse_rows_output(result.output, 'snapshot')
-        verify_list = jails_as_rows(jail.recursive_snapshots, full=full)
+        if type(jail) is list:
+            jails = jail
+            orig_list = parse_rows_output(result.output, 'snapall')
+            verify_list = []
+            for jail in jails:
+                for row in jails_as_rows(jail.recursive_snapshots, full=full):
+                    row.jail = jail.name
+                    verify_list.append(row)
+        else:
+            orig_list = parse_rows_output(result.output, 'snapshot')
+            verify_list = jails_as_rows(jail.recursive_snapshots, full=full)
 
         verify_list.sort(key=lambda r: r.sort_flag(flag))
 
@@ -88,4 +100,32 @@ def test_03_list_snapshots_of_jail_with_long_flag(
 
     common_function(
         invoke_cli, jails[0], parse_rows_output, jails_as_rows, True
+    )
+
+
+@require_root
+@require_zpool
+def test_04_list_snapshots_of_all_jails(
+    invoke_cli, resource_selector, skip_test,
+    parse_rows_output, jails_as_rows
+):
+    jails = resource_selector.all_jails_having_snapshots
+    skip_test(not jails)
+
+    common_function(
+        invoke_cli, jails, parse_rows_output, jails_as_rows
+    )
+
+
+@require_root
+@require_zpool
+def test_05_list_snapshots_of_all_jails_with_long_flag(
+    invoke_cli, resource_selector, skip_test,
+    parse_rows_output, jails_as_rows
+):
+    jails = resource_selector.all_jails_having_snapshots
+    skip_test(not jails)
+
+    common_function(
+        invoke_cli, jails, parse_rows_output, jails_as_rows, True
     )

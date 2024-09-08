@@ -83,7 +83,7 @@ def callback(_log, callback_exception):
         else:
             if not isinstance(message, str) and isinstance(
                 message,
-                collections.Iterable
+                collections.abc.Iterable
             ):
                 message = '\n'.join(message)
 

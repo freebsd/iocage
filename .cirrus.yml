@@ -1,5 +1,5 @@
 freebsd_instance:
-  image_family: freebsd-13-2
+  image_family: freebsd-14-1
 
 iocage_tests_task:
   create_pool_script:
@@ -7,16 +7,19 @@ iocage_tests_task:
     - zpool create pool /root/poolfile
   install_pkgs_script:
     - sed -i '' 's/quarterly/latest/g' /etc/pkg/FreeBSD.conf
-    - pkg install -y git python3 py39-sqlite3
+    - pkg install -y git python3 py311-sqlite3
+    - pkg install -y rust
   configure_python_script:
     - python3 -m ensurepip
   pip_cache:
     folder: ~/.cache/pip
     populate_script:
-      - python3 install -r requirements-test.txt
+      - python3 -m pip install -r requirements-test.txt
+      - python3 -m pip install -r requirements.txt
       - python3 -m pip install -U cython
   env_setup_script:
     - python3 -m pip install -U -r requirements-test.txt
+    - python3 -m pip install -U -r requirements.txt
     - mount -t fdescfs null /dev/fd
     - pkg install -y devel/py-libzfs
   install_iocage_script:

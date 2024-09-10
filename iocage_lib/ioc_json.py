@@ -434,7 +434,7 @@ class IOCConfiguration:
     @staticmethod
     def get_version():
         """Sets the iocage configuration version."""
-        version = '32'
+        version = '33'
 
         return version
 
@@ -823,9 +823,9 @@ class IOCConfiguration:
         if not conf.get('allow_mlock'):
             conf['allow_mlock'] = 0
 
-        # Version 13 keys
+        # Version 13 keys - default changed to 'none' in 33
         if not conf.get('vnet_default_interface'):
-            conf['vnet_default_interface'] = 'auto'
+            conf['vnet_default_interface'] = 'none'
         else:
             # Catch all users migrating from old prop value of none, which
             # meant auto

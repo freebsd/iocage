@@ -320,7 +320,6 @@ class IOCStart(object):
                 except su.CalledProcessError:
                     iocage_lib.ioc_common.checkoutput(
                         ["zfs", "create", "-o",
-                         "compression=lz4", "-o",
                          "mountpoint=none",
                          f"{self.pool}/{jdataset}"],
                         stderr=su.STDOUT)

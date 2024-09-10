@@ -116,7 +116,6 @@ class IOCCheck(object):
                     silent=self.silent)
 
                 dataset_options = {
-                    "compression": "lz4",
                     "aclmode": "passthrough",
                     "aclinherit": "passthrough"
                 }

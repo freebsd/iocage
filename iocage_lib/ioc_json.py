@@ -1243,7 +1243,7 @@ class IOCConfiguration:
             'sync_state': 'none',
             'sync_target': 'none',
             'sync_tgt_zpool': 'none',
-            'compression': 'lz4',
+            'compression': 'on',
             'origin': 'readonly',
             'quota': 'none',
             'mountpoint': 'readonly',
@@ -2190,7 +2190,6 @@ class IOCJson(IOCConfiguration):
 
         zfs_props = {
             # ZFS Props
-            "compression": "lz4",
             "origin": "readonly",
             "quota": "none",
             "mountpoint": "readonly",

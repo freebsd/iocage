@@ -910,13 +910,14 @@ class IOCage:
                 raise e
             return
 
-        if interactive:
+        if interactive or pkg:
             ioc_exec.InteractiveExec(
                 command,
                 path,
                 uuid=uuid,
                 host_user=host_user,
                 jail_user=jail_user,
+                unjailed=pkg,
                 skip=True
             )
             return
@@ -928,7 +929,7 @@ class IOCage:
                 uuid=uuid,
                 host_user=host_user,
                 jail_user=jail_user,
-                unjailed=pkg,
+                unjailed=unjailed,
                 su_env=su_env
             ) as _exec:
                 output = ioc_common.consume_and_log(

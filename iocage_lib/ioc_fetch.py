@@ -244,7 +244,7 @@ class IOCFetch:
                 pass
             else:
                 self.zpool.create_dataset({
-                    'name': pool_dataset
+                    'name': pool_dataset, 'properties': {}
                 })
 
             for f in self.files:
@@ -661,7 +661,7 @@ class IOCFetch:
 
             ds = Dataset(dataset)
             if not ds.exists:
-                ds.create()
+                ds.create('properties': {})
             if not ds.mounted:
                 ds.mount()
 
@@ -810,6 +810,7 @@ class IOCFetch:
         if not os.path.isdir(dest):
             self.zpool.create_dataset({
                 'name': dataset, 'create_ancestors': True,
+                'properties': {},
             })
 
         with tarfile.open(src) as f:

@@ -5,23 +5,48 @@ iocage_tests_task:
   create_pool_script:
     - truncate -s 20G /root/poolfile
     - zpool create pool /root/poolfile
+  prepare_pkg_script:
+      - sed -i '' 's/quarterly/latest/g' /etc/pkg/FreeBSD.conf
+  pkg_cache:
+    folder: /var/cache/pkg
+    populate_script:
+        - pkg fetch -udy git python3 py311-sqlite3 devel/py-libzfs
+        - pkg fetch -Udy rust
+        - sed -E 's/([^<>=]+).*/py311-\1/' requirements.txt requirements-test.txt | xargs pkg fetch -Udy
   install_pkgs_script:
-    - sed -i '' 's/quarterly/latest/g' /etc/pkg/FreeBSD.conf
-    - pkg install -y git python3 py311-sqlite3
-    - pkg install -y rust
+    - pkg update
+    - pkg install -Uy git python3 py311-sqlite3
   configure_python_script:
     - python3 -m ensurepip
-  pip_cache:
-    folder: ~/.cache/pip
-    populate_script:
-      - python3 -m pip install -r requirements-test.txt
-      - python3 -m pip install -r requirements.txt
-      - python3 -m pip install -U cython
+  matrix:
+    - name: Build python packages
+      install_rust_script:
+        - pkg install -Uy rust
+      pip_cache:
+        folder: ~/.cache/pip
+        populate_script:
+          - python3 -m pip install -r requirements-test.txt
+          - python3 -m pip install -r requirements.txt
+          - python3 -m pip install -U cython
+      update_cache_script:
+        - python3 -m pip install -U -r requirements-test.txt
+        - python3 -m pip install -U -r requirements.txt
+      upload_caches:
+        - pip
+    - name: Use prebuilt packages
+      install_python_packages_script:
+        - sed -E 's/([^<>=]+).*/py311-\1/' requirements.txt requirements-test.txt | xargs pkg install -Uy
+        # Necessary as long as py311-pytest and py311-pytest-pep8 conflict
+        - python3 -m pip install -r requirements-test.txt
   env_setup_script:
-    - python3 -m pip install -U -r requirements-test.txt
-    - python3 -m pip install -U -r requirements.txt
     - mount -t fdescfs null /dev/fd
-    - pkg install -y devel/py-libzfs
+    - pkg install -Uy devel/py-libzfs
+  upload_caches:
+    - pkg
   install_iocage_script:
     - python3 setup.py install
-  test_script: pytest --zpool=pool tests/functional_tests
+  test_script: pytest --zpool=pool tests/functional_tests --junit-xml=reports/pytest-report.xml -rA --image
+  always:
+    pytest_results_artifacts:
+      path: reports/*.xml
+      format: junit

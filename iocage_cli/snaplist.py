@@ -43,10 +43,10 @@ def cli(header, jail, _long, _sort):
     snap_list = ioc.IOCage(jail=jail).snap_list(_long, _sort)
 
     if header:
-        snap_list.insert(0, ["NAME", "CREATED", "RSIZE", "USED"])
+        table.header(["NAME", "CREATED", "RSIZE", "USED"])
         # We get an infinite float otherwise.
         table.set_cols_dtype(["t", "t", "t", "t"])
-        table.add_rows(snap_list)
+        table.add_rows(snap_list, header=False)
         ioc_common.logit({
             "level"  : "INFO",
             "message": table.draw()

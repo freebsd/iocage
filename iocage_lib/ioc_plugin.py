@@ -975,9 +975,9 @@ fingerprint: {fingerprint}
                     )
                     for p in plugin_list
                 ]
-                plugin_list.insert(0, list_header)
 
-                table.add_rows(plugin_list)
+                table.header(list_header)
+                table.add_rows(plugin_list, header=False)
 
                 return table.draw()
 

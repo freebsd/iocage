@@ -487,19 +487,16 @@ def sort_release(releases, split=False, fetch_releases=False):
                     pass
 
     ordered_r_dict = collections.OrderedDict(sorted(r_dict.items()))
-    index = 0
 
     for r, t in ordered_r_dict.items():
         if split:
             r = r.rsplit('_')[0]  # Remove the enumeration
             if t:
-                release_list.insert(index, [f"{r}-{t}"])
+                release_list.append([f"{r}-{t}"])
             else:
-                release_list.insert(index, [r])
-            index += 1
+                release_list.append([r])
         else:
-            release_list.insert(index, f"{r}-{t}")
-            index += 1
+            release_list.append(f"{r}-{t}")
 
     return release_list
 

@@ -37,7 +37,7 @@ class Dataset(Resource):
         if self.cache:
             self._properties = deepcopy(cache.datasets.get(self.resource_name))
 
-    def create(self, data):
+    def create(self, data={}):
         cache.reset()
         return create_dataset({'name': self.resource_name, **data})
 

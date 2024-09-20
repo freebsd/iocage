@@ -37,7 +37,7 @@ def common_function(
     jails_as_rows, full=False
 ):
     for flag in SORTING_FLAGS:
-        if type(jail) is list:
+        if isinstance(jail, list):
             command = ['snaplist', 'ALL', '-s', flag]
         else:
             command = ['snaplist', jail.name, '-s', flag]
@@ -48,7 +48,7 @@ def common_function(
             command
         )
 
-        if type(jail) is list:
+        if isinstance(jail, list):
             jails = jail
             orig_list = parse_rows_output(result.output, 'snapall')
             verify_list = []

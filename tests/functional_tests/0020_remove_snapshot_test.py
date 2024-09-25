@@ -29,6 +29,7 @@ require_root = pytest.mark.require_root
 require_zpool = pytest.mark.require_zpool
 
 SNAP_NAME = 'snaptest'
+SNAPALL_NAME = 'snapalltest'
 
 
 @require_root
@@ -60,3 +61,129 @@ def test_01_remove_snapshot(invoke_cli, resource_selector, skip_test):
     )
 
     assert remove_snap.exists is False
+
+
+@require_root
+@require_zpool
+def test_02_remove_snapshot_of_all_jails(
+    invoke_cli, resource_selector, skip_test):
+    jails = resource_selector.all_jails
+    skip_test(not jails)
+
+    snap_jails = []
+    for jail in jails:
+        if any(
+            SNAPALL_NAME in snap.id for snap in jail.recursive_snapshots
+        ):
+            snap_jails.append(jail)
+
+    skip_test(not snap_jails)
+
+    remove_snaps = []
+    for snap_jail in snap_jails:
+        for snap in snap_jail.recursive_snapshots:
+            if SNAPALL_NAME in snap.id:
+                remove_snaps.append(snap)
+
+    assert all(snap.exists is True for snap in remove_snaps)
+
+    invoke_cli(
+        ['snapremove', '-n', SNAPALL_NAME, 'ALL']
+    )
+
+    assert all(snap.exists is False for snap in remove_snaps)
+
+@require_root
+@require_zpool
+def test_03_remove_all_snapshots_fail(invoke_cli, resource_selector, skip_test):
+    jails = resource_selector.all_jails_having_snapshots
+    skip_test(not jails)
+
+    snap_jail = None
+    for jail in jails:
+        if (not jail.is_template and not jail.is_cloned and
+            len(jail.recursive_snapshots)>0):
+            snap_jail = jail
+            break
+
+    skip_test(not snap_jail)
+
+    failremove_snap = snap_jail.recursive_snapshots[0]
+
+    assert failremove_snap.exists is True
+
+    # Voluntarily forgetting the -f force flag
+    invoke_cli(
+        ['snapremove', '-n', 'ALL', snap_jail.name],
+        assert_returncode=False
+    )
+
+    assert failremove_snap.exists is True
+
+
+@require_root
+@require_zpool
+def test_04_remove_all_snapshots_success(invoke_cli, resource_selector,
+                                        snapshot, skip_test):
+    jails = resource_selector.all_jails_having_snapshots
+    skip_test(not jails)
+
+    snap_jail = None
+    for jail in jails:
+        if (not jail.is_template and not jail.is_cloned and
+            len(jail.recursive_snapshots)>1):
+            snap_jail = jail
+            break
+
+    skip_test(not snap_jail)
+
+    remove_snaps = set(snap_jail.recursive_snapshots)
+    assert all(snap.exists is True for snap in remove_snaps)
+
+    cloned_snaps = resource_selector.cloned_snapshots_set
+    assert all(snap.exists is True for snap in cloned_snaps)
+
+    filtered_remove_snaps = remove_snaps - {
+            snapshot(s, s.rsplit('@', 1)[0])
+            for snap in cloned_snaps
+            for s in (snap.name.replace('/root@', '@'), snap.name)
+            }
+
+    result = invoke_cli(
+        ['snapremove', '-n', 'ALL', snap_jail.name, '--force']
+    )
+
+    assert all(snap.exists is False for snap in filtered_remove_snaps)
+    assert all(snap.exists is True for snap in cloned_snaps)
+
+
+@require_root
+@require_zpool
+def test_05_remove_all_snapshots_all_jails(invoke_cli, resource_selector,
+                                        snapshot, skip_test):
+    jails = resource_selector.all_jails_having_snapshots
+    skip_test(not jails)
+
+    cloned_snaps = resource_selector.cloned_snapshots_set
+    assert all(snap.exists is True for snap in cloned_snaps)
+
+    remove_snaps = {
+        snap for jail in jails for snap in jail.recursive_snapshots
+    }
+    assert all(snap.exists is True for snap in remove_snaps)
+
+    # We want to keep cloned jail datasets, cloned root datasets,
+    # and non-cloned jail datasets that contain cloned root datasets.
+    # This last case happens when creating jails from templates.
+    filtered_remove_snaps = remove_snaps - {
+        snapshot(s, s.rsplit('@', 1)[0])
+        for snap in cloned_snaps
+        for s in (snap.name.replace('/root@', '@'), snap.name)
+        }
+
+    result = invoke_cli(
+        ['snapremove', '-n', 'ALL', 'ALL', '--force']
+    )
+
+    assert all(snap.exists is False for snap in filtered_remove_snaps)
+    assert all(snap.exists is True for snap in cloned_snaps)

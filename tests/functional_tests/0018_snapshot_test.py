@@ -30,6 +30,7 @@ require_zpool = pytest.mark.require_zpool
 
 
 SNAP_NAME = 'snaptest'
+SNAPALL_NAME = 'snapalltest'
 
 
 def common_function(invoke_cli, jails, skip_test):
@@ -44,6 +45,20 @@ def common_function(invoke_cli, jails, skip_test):
     assert [
         s.id.split('@')[1] for s in jail.recursive_snapshots
     ].count(SNAP_NAME) >= 2
+
+
+def all_jails_function(invoke_cli, jails, skip_test):
+    skip_test(not jails)
+
+    invoke_cli(
+        ['snapshot', 'ALL', '-n', SNAPALL_NAME]
+    )
+
+    for jail in jails:
+        # We use count because of template and cloned jails
+        assert [
+            s.id.split('@')[1] for s in jail.recursive_snapshots
+        ].count(SNAPALL_NAME) >= 2
 
 
 @require_root
@@ -66,3 +81,9 @@ def test_02_snapshot_of_template_jail(invoke_cli, resource_selector, skip_test):
 @require_zpool
 def test_03_snapshot_of_cloned_jail(invoke_cli, resource_selector, skip_test):
     common_function(invoke_cli, resource_selector.cloned_jails, skip_test)
+
+
+@require_root
+@require_zpool
+def test_04_snapshot_of_all_jails(invoke_cli, resource_selector, skip_test):
+    all_jails_function(invoke_cli, resource_selector.all_jails, skip_test)

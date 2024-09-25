@@ -74,8 +74,8 @@ def cli(force, delete):
     for uuid, path in jails.items():
         pool = ioc_json.IOCJson().json_get_value("pool")
         iocroot = ioc_json.IOCJson(pool).json_get_value("iocroot")
-        jail = f"{pool}/iocage/jails/{uuid}"
-        jail_old = f"{pool}/iocage/jails_old/{uuid}"
+        jail = f"{iocroot}/jails/{uuid}"
+        jail_old = f"{iocroot}/jails_old/{uuid}"
         conf = ioc_json.IOCJson(path).json_get_value('all')
 
         try:
@@ -164,7 +164,7 @@ def cli(force, delete):
                 try:
                     su.check_call([
                         "zfs", "destroy", "-r", "-f",
-                        f"{pool}/iocage/jails_old"
+                        f"{iocroot}/jails_old"
                     ])
                 except su.CalledProcessError:
                     # We just want the top level dataset gone, no big deal.

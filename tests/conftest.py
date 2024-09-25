@@ -99,6 +99,9 @@ def pytest_addoption(parser):
         '--image', action='store_true', default=False,
         help='Run image operations (export/import)'
     )
+    parser.addoption(
+        '--prefix', action='store', default='',
+        help='Prefix to use in ZFS dataset paths')
 
 
 def pytest_runtest_setup(item):
@@ -146,6 +149,12 @@ def pytest_runtest_setup(item):
 def zpool(request):
     """Specify a zpool to use."""
     return request.config.getoption('--zpool')
+
+
+@pytest.fixture
+def prefix(request):
+    """Specify a prefix to use in ZFS dataset paths"""
+    return request.config.getoption('--prefix')
 
 
 @pytest.fixture
@@ -313,6 +322,12 @@ def zfs():
 def jail():
     from tests.data_classes import Jail
     return Jail
+
+
+@pytest.fixture
+def snapshot():
+    from tests.data_classes import Snapshot
+    return Snapshot
 
 
 @pytest.fixture

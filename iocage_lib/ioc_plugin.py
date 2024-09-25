@@ -575,7 +575,7 @@ class IOCPlugin(object):
 
         jaildir = f"{self.iocroot}/jails/{self.jail}"
         repo_dir = f"{jaildir}/root/usr/local/etc/pkg/repos"
-        path = f"{self.pool}/iocage/jails/{self.jail}"
+        path = f"{self.iocroot}/jails/{self.jail}"
         _conf = iocage_lib.ioc_json.IOCJson(jaildir).json_get_value('all')
 
         # We do these tests again as the user could supply a malformed IP to
@@ -1464,7 +1464,7 @@ fingerprint: {fingerprint}
         names = [f'ioc_plugin_{name}_{self.date}', f'ioc_update_{release}']
 
         for snap in Dataset(
-            f'{self.pool}/iocage/jails/{self.jail}'
+            f'{self.iocroot}/jails/{self.jail}'
         ).snapshots_recursive():
             snap_name = snap.name
 

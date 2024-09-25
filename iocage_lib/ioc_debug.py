@@ -30,7 +30,7 @@ import iocage_lib.ioc_json as ioc_json
 import iocage_lib.ioc_list as ioc_list
 
 from iocage_lib.dataset import Dataset
-from iocage_lib.pools import PoolListableResource
+from iocage_lib.pools import PoolListableResource, Pool
 
 
 class IOCDebug(object):
@@ -55,6 +55,7 @@ class IOCDebug(object):
 
     def __init__(self, path, silent=False, callback=None):
         self.pool = ioc_json.IOCJson(' ').json_get_value('pool')
+        self.zpool = Pool(self.pool)
         self.path = path
         self.callback = callback
         self.silent = silent
@@ -64,10 +65,14 @@ class IOCDebug(object):
         self.run_host_debug()
 
         jails = Dataset(
-            os.path.join(self.pool, 'iocage/jails')
+            os.path.join(
+                self.zpool.name, self.zpool.prefix, 'iocage', 'jails'
+            )
         ).get_dependents()
         templates = Dataset(
-            os.path.join(self.pool, 'iocage/templates')
+            os.path.join(
+                self.zpool.name, self.zpool.prefix, 'iocage', 'templates'
+            )
         ).get_dependents()
 
         for jail in jails:

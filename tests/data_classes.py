@@ -27,7 +27,7 @@ class Row:
         for attr in [
             'name', 'jid', 'state', 'release', 'ip4', 'ip6', 'orig_release',
             'boot', 'type', 'template', 'basejail', 'crt', 'res', 'qta',
-            'use', 'ava', 'created', 'rsize', 'used', 'orig_name'
+            'use', 'ava', 'created', 'rsize', 'used', 'orig_name', 'jail'
         ]:
             setattr(self, attr, None)
 
@@ -268,10 +268,15 @@ class Row:
         self.name, self.created, self.rsize, self.used = self.standard_parse()
 
 
+    def snapall_parse(self):
+        self.jail, self.name, self.created, self.rsize, self.used = self.standard_parse()
+
+
 class ZFS:
     # TODO: Improve how we manage zfs object here
     pool = None
     pool_mountpoint = None
+    prefix = None
 
     def __init__(self):
         pass
@@ -293,6 +298,7 @@ class ZFS:
 
                     ZFS.pool = pools[0].name
                     ZFS.pool_mountpoint = pools[0].root_dataset.mountpoint
+                    ZFS.prefix = pools[0].root_dataset.__getstate__().get('properties').get('org.freebsd.ioc:prefix', {}).get('value', '')
 
     @staticmethod
     def get(identifier):
@@ -346,27 +352,39 @@ class ZFS:
 
     @property
     def iocage_dataset(self):
-        return self.get_dataset(f'{self.pool}/iocage')
+        return self.get_dataset(os.path.join(self.pool, self.prefix, 'iocage'))
 
     @property
     def releases_dataset(self):
-        return self.get_dataset(f'{self.pool}/iocage/releases')
+        return self.get_dataset(os.path.join(self.pool, self.prefix, 'iocage/releases'))
 
     @property
     def images_dataset_path(self):
-        return os.path.join(ZFS.pool_mountpoint, 'iocage/images')
+        return os.path.join(ZFS.pool_mountpoint, ZFS.prefix, 'iocage/images')
 
 
 class Resource:
     DEFAULT_JSON_FILE = 'config.json'
 
     def __init__(self, name, zfs=None):
-        self.name = name
-        self.zfs = ZFS() if not zfs else zfs
+        super().__setattr__('name', name)
+        super().__setattr__('zfs', ZFS() if not zfs else zfs)
         assert isinstance(self.zfs, ZFS) is True
 
+    def __eq__(self, other):
+        return self.name == other.name
+    
+    def __hash__(self):
+        return hash(self.name)
+    
     def __repr__(self):
         return self.name
+
+    def __setattr__(self, name, attr_value):
+        raise AttributeError(f"Resources are immutable. Cannot set attribute '{name}'.")
+
+    def __delattr__(self, name):
+        raise AttributeError(f"Resources are immutable. Cannot delete attribute '{name}'.")
 
     def convert_to_row(self, **kwargs):
         raise NotImplemented
@@ -376,12 +394,12 @@ class Snapshot(Resource):
 
     def __init__(self, name, parent_dataset, zfs=None):
         super().__init__(name, zfs)
-        self.parent = parent_dataset
+        object.__setattr__(self, 'parent', parent_dataset)
         if isinstance(self.parent, str):
-            self.parent = Jail(self.parent)
+            object.__setattr__(self, 'parent', Jail(self.parent))
         if self.exists:
             for k, v in self.zfs.get_snapshot_safely(self.name).items():
-                setattr(self, k, v)
+                object.__setattr__(self, k, v)
 
     @property
     def exists(self):
@@ -491,13 +509,12 @@ class Jail(Resource):
     @property
     def path(self):
         # Jail can be either under `jails` or `templates` datasets
-        if self.zfs.get_dataset(
-            f'{self.zfs.pool}/iocage/jails/{self.name}'
+        if self.zfs.get_dataset(os.path.join(self.zfs.pool, self.zfs.prefix, 'iocage/jails', self.name)
         ):
             dataset = 'jails'
         else:
             dataset = 'templates'
-        return f'{self.zfs.pool}/iocage/{dataset}/{self.name}'
+        return os.path.join(self.zfs.pool, self.zfs.prefix, 'iocage', dataset, self.name)
 
     @property
     def absolute_path(self):
@@ -625,7 +642,7 @@ class Jail(Resource):
     @property
     def is_cloned(self):
         return bool(
-            self.jail_dataset[
+            self.root_dataset[
                 'properties'
             ].get('origin', {}).get('value')
         )
@@ -795,3 +812,20 @@ class ResourceSelector:
         return [
             j for j in self.all_jails if j.config.get(key, None) == value
         ]
+
+    @property
+    def cloned_snapshots_set(self):
+        cloned_jails = self.cloned_jails
+        origins = {
+            jail.root_dataset['properties']['origin']['value']
+            for jail in cloned_jails
+        }
+        origins |= {
+            jail.jail_dataset['properties']['origin']['value']
+            for jail in cloned_jails
+        }
+        origins -= { "" }
+        return {
+            Snapshot(origin, origin.rsplit('@', 1)[0])
+            for origin in origins
+        }

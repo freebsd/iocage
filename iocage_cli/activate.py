@@ -31,12 +31,22 @@ __rootcmd__ = True
 
 
 @click.command(name="activate", help="Set a zpool active for iocage usage.")
+@click.option(
+    "--prefix", "-p", default='',
+    help="Provide a prefix for dataset path."
+)
 @click.argument("zpool")
-def cli(zpool):
+def cli(zpool, prefix):
     """Calls ZFS set to change the property org.freebsd.ioc:active to yes."""
-    ioc.IOCage(activate=True).activate(zpool)
+    ioc.IOCage(activate=True).activate(zpool, prefix)
 
     ioc_common.logit({
         "level"  : "INFO",
         "message": f"ZFS pool '{zpool}' successfully activated."
     })
+    
+    if prefix:
+      ioc_common.logit({
+              "level"  : "INFO",
+              "message": f"Dataset prefix '{prefix}' set."
+          })

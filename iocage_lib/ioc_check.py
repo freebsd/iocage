@@ -32,7 +32,8 @@ import iocage_lib.ioc_json
 
 from iocage_lib.cache import cache
 from iocage_lib.dataset import Dataset
-from iocage_lib.zfs import ZFSException
+from iocage_lib.pools import Pool
+from iocage_lib.zfs import ZFSException, IOCAGE_PREFIX_PROP
 
 DATASET_CREATION_LOCK = threading.Lock()
 
@@ -51,6 +52,7 @@ class IOCCheck(object):
             silent=silent,
             checking_datasets=True
         ).json_get_value("pool")
+        self.zpool = Pool(self.pool)
         self.callback = callback
         self.silent = silent
 
@@ -59,7 +61,8 @@ class IOCCheck(object):
 
         self.pool_root_dataset = Dataset(self.pool, cache=reset_cache)
         self.iocage_dataset = Dataset(
-            os.path.join(self.pool, 'iocage'), cache=reset_cache
+            os.path.join(self.zpool.name, self.zpool.prefix, 'iocage'),
+            cache=reset_cache
         )
 
         if migrate:
@@ -87,6 +90,14 @@ class IOCCheck(object):
         datasets = ("iocage", "iocage/download", "iocage/images",
                     "iocage/jails", "iocage/log", "iocage/releases",
                     "iocage/templates")
+        if self.zpool.prefix != '':
+            prefix_split = self.zpool.prefix.split('/')
+            datasets = *(
+                os.path.join(*prefix_split[:n+1])
+                for n in range(len(prefix_split))
+            ), *(
+                os.path.join(self.zpool.prefix, ioc_ds) for ioc_ds in datasets
+            )
 
         for dataset in datasets:
             zfs_dataset_name = f"{self.pool}/{dataset}"

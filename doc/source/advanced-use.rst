@@ -158,6 +158,8 @@ Snapshots are point-in-time copies of data, a safety point to which a
 jail can be reverted at any time. Initially, snapshots take up almost no
 space, as only changing data is recorded.
 
+You may use **ALL** as a target jail name for these commands if you want to target all jails at once.
+
 List snapshots for a jail:
 
 :command:`iocage snaplist [UUID|NAME]`
@@ -167,6 +169,18 @@ Create a new snapshot:
 :command:`iocage snapshot [UUID|NAME]`
 
 This creates a snapshot based on the current time.
+
+:command:`iocage snapshot [UUID|NAME] -n [SNAPSHOT NAME]`
+
+This creates a snapshot with the given name.
+
+Delete a snapshot:
+
+:command:`iocage snapremove [UUID|NAME] -n [SNAPSHOT NAME]`
+
+Delete all snapshots from a jail (requires `-f / --force`):
+
+:command:`iocage snapremove [UUID|NAME] -n ALL -f`
 
 .. index:: Resource Limits
 .. _Resource Limits:

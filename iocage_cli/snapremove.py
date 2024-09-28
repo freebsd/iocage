@@ -25,6 +25,7 @@
 
 import click
 
+import iocage_lib.ioc_common as ioc_common
 import iocage_lib.iocage as ioc
 
 
@@ -32,6 +33,15 @@ import iocage_lib.iocage as ioc
 @click.argument("jail")
 @click.option("--name", "-n", help="The snapshot name. This will be what comes"
                                    " after @", required=True)
-def cli(jail, name):
+@click.option("--force", "-f", is_flag=True, default=False,
+    help="Force removal (required for -n ALL)")
+def cli(jail, name, force):
     """Removes a snapshot from a user supplied jail."""
-    ioc.IOCage(jail=jail).snap_remove(name)
+    if name == 'ALL' and not force:
+        ioc_common.logit({
+                    "level": "EXCEPTION",
+                    "message": 'Usage: iocage snapremove [OPTIONS] JAILS...\n'
+                               '\nError: Mass snapshot deletion requires "force" (-f).'
+                })
+    skip_jails = jail != 'ALL'
+    ioc.IOCage(jail=jail, skip_jails=skip_jails).snap_remove(name)

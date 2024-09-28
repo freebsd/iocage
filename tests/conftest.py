@@ -316,6 +316,12 @@ def jail():
 
 
 @pytest.fixture
+def snapshot():
+    from tests.data_classes import Snapshot
+    return Snapshot
+
+
+@pytest.fixture
 def resource_selector():
     from tests.data_classes import ResourceSelector
     return ResourceSelector()

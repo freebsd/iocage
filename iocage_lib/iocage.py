@@ -1891,7 +1891,7 @@ class IOCage:
             self.jail = jail
             self.update(pkgs)
 
-    def update(self, pkgs=False):
+    def update(self, pkgs=False, server=None, verify=True):
         """Updates a jail to the latest patchset."""
         if self._all:
             self.update_all(pkgs)
@@ -2014,6 +2014,8 @@ class IOCage:
             try:
                 ioc_fetch.IOCFetch(
                     release,
+                    server,
+                    verify=verify,
                     callback=self.callback
                 ).fetch_update(*params)
             finally:

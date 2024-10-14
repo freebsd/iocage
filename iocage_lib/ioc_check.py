@@ -54,7 +54,6 @@ class IOCCheck(object):
         self.callback = callback
         self.silent = silent
 
-        self.__check_fd_mount__()
         self.__check_datasets__()
 
         self.pool_root_dataset = Dataset(self.pool, cache=reset_cache)
@@ -134,34 +133,3 @@ class IOCCheck(object):
                 },
                     _callback=self.callback)
 
-    def __check_fd_mount__(self):
-        """
-        Checks if /dev/fd is mounted, and if not, give the user a
-        warning.
-        """
-
-        if os.path.ismount("/dev/fd"):
-            # all good!
-
-            return
-
-        messages = collections.OrderedDict([
-            ("1-NOTICE", "*" * 80),
-            ("2-WARNING", "fdescfs(5) is not mounted, performance"
-                          " may suffer. Please run:"),
-            ("3-INFO", "mount -t fdescfs null /dev/fd"),
-            ("4-WARNING", "You can also permanently mount it in"
-                          " /etc/fstab with the following entry:"),
-            ("5-INFO", "fdescfs /dev/fd  fdescfs  rw  0  0"),
-            ("6-NOTICE", f"{'*' * 80}\n")
-        ])
-
-        for level, msg in messages.items():
-            level = level.partition("-")[2]
-
-            iocage_lib.ioc_common.logit({
-                "level": level,
-                "message": msg
-            },
-                _callback=self.callback,
-                silent=self.silent)

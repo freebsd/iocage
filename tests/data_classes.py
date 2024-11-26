@@ -669,10 +669,11 @@ class Jail(Resource):
                 ip for ip in ips if ip not in skip_ips
             ]
 
-    def run_command(self, command):
+    def run_command(self, command, jailed=True):
         # Returns a tuple - stdout, stderr
-        assert self.running is True
-        command = ['jexec', f'ioc-{self.name}'] + command
+        if jailed:
+            assert self.running is True
+            command = ['jexec', f'ioc-{self.name}'] + command
         try:
             stdout, stderr = subprocess.Popen(
                 command, stdout=subprocess.PIPE, stderr=subprocess.PIPE

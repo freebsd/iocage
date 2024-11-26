@@ -1151,7 +1151,7 @@ class IOCStart(object):
         """
         Start VNET on interface
 
-        :param nic_defs: comma separated interface definitions (nic, bridge)
+        :param nic_defs: comma separated interface definitions (nic:bridge, nic:bridge...)
         :param net_configs: Tuple of IP address and router pairs
         :param jid: The jails ID
         """
@@ -1167,7 +1167,7 @@ class IOCStart(object):
             try:
                 if self.get(f"{nic}_mtu") != 'auto':
                     membermtu = self.get(f"{nic}_mtu")
-                elif not nat_addr:
+                elif not nat_addr and bridge != 'none':
                     membermtu = self.find_bridge_mtu(bridge)
                 else:
                     membermtu = self.get('vnet_default_mtu')
@@ -1301,7 +1301,7 @@ class IOCStart(object):
                 stderr=su.STDOUT
             )
 
-            if not nat_addr:
+            if bridge != 'none' and not nat_addr:
                 try:
                     # Host interface as supplied by user also needs to be on
                     # the bridge
@@ -1319,7 +1319,7 @@ class IOCStart(object):
                     ['ifconfig', bridge, 'addm', f'{nic}.{jid}', 'up'],
                     stderr=su.STDOUT
                 )
-            else:
+            elif nat_addr:
                 iocage_lib.ioc_common.checkoutput(
                     ['ifconfig', f'{nic}.{jid}', 'inet', f'{nat_addr}/30'],
                     stderr=su.STDOUT

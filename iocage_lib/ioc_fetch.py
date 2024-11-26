@@ -47,6 +47,9 @@ import iocage_lib.ioc_start
 from iocage_lib.pools import Pool
 from iocage_lib.dataset import Dataset
 
+# deliberately crash if tarfile doesn't have required filter
+tarfile.tar_filter
+
 
 class IOCFetch:
 
@@ -817,7 +820,7 @@ class IOCFetch:
             # removing them first.
             member = self.__fetch_extract_remove__(f)
             member = self.__fetch_check_members__(member)
-            f.extractall(dest, members=member)
+            f.extractall(dest, members=member, filter='tar')
 
     def fetch_update(self, cli=False, uuid=None):
         """This calls 'freebsd-update' to update the fetched RELEASE."""

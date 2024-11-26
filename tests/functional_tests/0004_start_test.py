@@ -57,9 +57,9 @@ def test_02_start_rc_jail(invoke_cli, resource_selector):
     for jail in resource_selector.rcjails:
         assert jail.running is True, f'{jail.name} not running'
 
-
 # Network-related tests belong here because the code is only executed at jail
 # start time.
+
 @require_root
 @require_zpool
 def test_03_create_and_start_nobridge_vnet_jail(release, jail, invoke_cli):
@@ -111,6 +111,8 @@ def test_03_create_and_start_nobridge_vnet_jail(release, jail, invoke_cli):
     finally:
         os.remove(path)
 
+
+# TODO: Let's also start jails in a single command to test that out
 
 @require_root
 @require_zpool

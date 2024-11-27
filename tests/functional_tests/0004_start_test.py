@@ -57,7 +57,8 @@ def test_02_start_rc_jail(invoke_cli, resource_selector):
     for jail in resource_selector.rcjails:
         assert jail.running is True, f'{jail.name} not running'
 
-# TODO: Let's also start jails in a single command to test that out
+# Network-related tests belong here because the code is only executed at jail
+# start time.
 
 @require_root
 @require_zpool
@@ -109,3 +110,30 @@ def test_03_create_and_start_nobridge_vnet_jail(release, jail, invoke_cli):
 
     finally:
         os.remove(path)
+
+
+# TODO: Let's also start jails in a single command to test that out
+
+@require_root
+@require_zpool
+def test_04_vnet_jail_with_loopback_alias(release, jail, invoke_cli):
+    jail = jail('loopback_alias_jail')
+
+    invoke_cli([
+        'create', '-r', release, '-n', jail.name,
+        'boot=on', 'vnet=on', 'defaultrouter=none',
+        f'ip4_addr=lo0|192.168.2.10'
+    ])
+
+    assert jail.exists is True
+    assert jail.running is True
+
+    stdout, stderr = jail.run_command(['ifconfig', 'lo0'])
+    assert bool(stderr) is False, f'Ifconfig returned an error: {stderr}'
+    assert '192.168.2.10' in stdout, (
+        'Could not set address on loopback interface.'
+    )
+
+    invoke_cli([
+        'destroy', jail.name, '-f'
+    ])

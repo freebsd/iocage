@@ -1174,7 +1174,7 @@ class IOCStart(object):
 
                 dhcp = self.get('dhcp')
 
-                ifaces = []
+                ifaces = ['lo0']
 
                 for addrs, gw, ipv6 in net_configs:
                     if (
@@ -1193,7 +1193,7 @@ class IOCStart(object):
                             # They didn't supply an interface, assuming default
                             iface, ip = "vnet0", addr
 
-                        if iface not in nics:
+                        if iface not in nics and iface != 'lo0':
                             continue
 
                         if iface not in ifaces:

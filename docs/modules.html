@@ -1,0 +1,513 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>iocage &#8212; iocage 1.9 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/agogo.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="header-wrapper" role="banner">
+      <div class="header">
+        <div class="headertitle"><a
+          href="index.html">iocage 1.9 documentation</a></div>
+        <div class="rel" role="navigation" aria-label="related navigation">
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a>
+        </div>
+       </div>
+    </div>
+
+    <div class="content-wrapper">
+      <div class="content">
+        <div class="document">
+            
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="iocage">
+<h1>iocage<a class="headerlink" href="#iocage" title="Permalink to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="fastentrypoints.html">fastentrypoints module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fastentrypoints.html#fastentrypoints.get_args"><code class="docutils literal notranslate"><span class="pre">get_args()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="fastentrypoints.html#fastentrypoints.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="iocage_cli.html">iocage_cli package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.activate">iocage_cli.activate module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.chroot">iocage_cli.chroot module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.clean">iocage_cli.clean module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.clone">iocage_cli.clone module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.clone.validate_count"><code class="docutils literal notranslate"><span class="pre">validate_count()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.console">iocage_cli.console module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.create">iocage_cli.create module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.create.validate_count"><code class="docutils literal notranslate"><span class="pre">validate_count()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.debug">iocage_cli.debug module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.destroy">iocage_cli.destroy module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.destroy.child_test"><code class="docutils literal notranslate"><span class="pre">child_test()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.df">iocage_cli.df module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.exec">iocage_cli.exec module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.export">iocage_cli.export module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.fetch">iocage_cli.fetch module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.fetch.validate_count"><code class="docutils literal notranslate"><span class="pre">validate_count()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.fstab">iocage_cli.fstab module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.get">iocage_cli.get module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.import">iocage_cli.import module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.list">iocage_cli.list module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.migrate">iocage_cli.migrate module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.pkg">iocage_cli.pkg module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.rename">iocage_cli.rename module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.restart">iocage_cli.restart module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.rollback">iocage_cli.rollback module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.set">iocage_cli.set module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.snaplist">iocage_cli.snaplist module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.snapremove">iocage_cli.snapremove module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.snapshot">iocage_cli.snapshot module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.start">iocage_cli.start module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.stop">iocage_cli.stop module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.update">iocage_cli.update module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli.upgrade">iocage_cli.upgrade module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_cli.html#module-iocage_cli">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.IOCLogger"><code class="docutils literal notranslate"><span class="pre">IOCLogger</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_cli.html#iocage_cli.IOCLogger.setConsoleLogLevel"><code class="docutils literal notranslate"><span class="pre">IOCLogger.setConsoleLogLevel()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.IOCageCLI"><code class="docutils literal notranslate"><span class="pre">IOCageCLI</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_cli.html#iocage_cli.IOCageCLI.get_command"><code class="docutils literal notranslate"><span class="pre">IOCageCLI.get_command()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_cli.html#iocage_cli.IOCageCLI.list_commands"><code class="docutils literal notranslate"><span class="pre">IOCageCLI.list_commands()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.InfoHandler"><code class="docutils literal notranslate"><span class="pre">InfoHandler</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_cli.html#iocage_cli.InfoHandler.emit"><code class="docutils literal notranslate"><span class="pre">InfoHandler.emit()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_cli.html#iocage_cli.print_version"><code class="docutils literal notranslate"><span class="pre">print_version()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="iocage_lib.html">iocage_lib package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_check">iocage_lib.ioc_check module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_check.IOCCheck"><code class="docutils literal notranslate"><span class="pre">IOCCheck</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_clean">iocage_lib.ioc_clean module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean"><code class="docutils literal notranslate"><span class="pre">IOCClean</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean.clean_all"><code class="docutils literal notranslate"><span class="pre">IOCClean.clean_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean.clean_debug"><code class="docutils literal notranslate"><span class="pre">IOCClean.clean_debug()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean.clean_images"><code class="docutils literal notranslate"><span class="pre">IOCClean.clean_images()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean.clean_jails"><code class="docutils literal notranslate"><span class="pre">IOCClean.clean_jails()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean.clean_releases"><code class="docutils literal notranslate"><span class="pre">IOCClean.clean_releases()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_clean.IOCClean.clean_templates"><code class="docutils literal notranslate"><span class="pre">IOCClean.clean_templates()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_common">iocage_lib.ioc_common module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.boolean_prop_exists"><code class="docutils literal notranslate"><span class="pre">boolean_prop_exists()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.callback"><code class="docutils literal notranslate"><span class="pre">callback()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.check_release_newer"><code class="docutils literal notranslate"><span class="pre">check_release_newer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.check_truthy"><code class="docutils literal notranslate"><span class="pre">check_truthy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.checkoutput"><code class="docutils literal notranslate"><span class="pre">checkoutput()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.construct_truthy"><code class="docutils literal notranslate"><span class="pre">construct_truthy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.consume_and_log"><code class="docutils literal notranslate"><span class="pre">consume_and_log()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.copytree"><code class="docutils literal notranslate"><span class="pre">copytree()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.gen_nat_ip"><code class="docutils literal notranslate"><span class="pre">gen_nat_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.gen_unused_lo_ip"><code class="docutils literal notranslate"><span class="pre">gen_unused_lo_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.generate_devfs_ruleset"><code class="docutils literal notranslate"><span class="pre">generate_devfs_ruleset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_active_jails"><code class="docutils literal notranslate"><span class="pre">get_active_jails()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_host_gateways"><code class="docutils literal notranslate"><span class="pre">get_host_gateways()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_host_release"><code class="docutils literal notranslate"><span class="pre">get_host_release()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_jail_freebsd_version"><code class="docutils literal notranslate"><span class="pre">get_jail_freebsd_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_jails_with_config"><code class="docutils literal notranslate"><span class="pre">get_jails_with_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_name_sortkey"><code class="docutils literal notranslate"><span class="pre">get_name_sortkey()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_natural_sortkey"><code class="docutils literal notranslate"><span class="pre">get_natural_sortkey()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_nested_key"><code class="docutils literal notranslate"><span class="pre">get_nested_key()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_size_sortkey"><code class="docutils literal notranslate"><span class="pre">get_size_sortkey()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.get_used_ips"><code class="docutils literal notranslate"><span class="pre">get_used_ips()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.ioc_sort"><code class="docutils literal notranslate"><span class="pre">ioc_sort()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.logit"><code class="docutils literal notranslate"><span class="pre">logit()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.lowercase_set"><code class="docutils literal notranslate"><span class="pre">lowercase_set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.match_to_dir"><code class="docutils literal notranslate"><span class="pre">match_to_dir()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.open_atomic"><code class="docutils literal notranslate"><span class="pre">open_atomic()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.parse_latest_release"><code class="docutils literal notranslate"><span class="pre">parse_latest_release()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.parse_package_name"><code class="docutils literal notranslate"><span class="pre">parse_package_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.raise_sort_error"><code class="docutils literal notranslate"><span class="pre">raise_sort_error()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.retrieve_admin_portals"><code class="docutils literal notranslate"><span class="pre">retrieve_admin_portals()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.retrieve_ip4_for_jail"><code class="docutils literal notranslate"><span class="pre">retrieve_ip4_for_jail()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.runscript"><code class="docutils literal notranslate"><span class="pre">runscript()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.set_interactive"><code class="docutils literal notranslate"><span class="pre">set_interactive()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.set_rcconf"><code class="docutils literal notranslate"><span class="pre">set_rcconf()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_ava"><code class="docutils literal notranslate"><span class="pre">sort_ava()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_boot"><code class="docutils literal notranslate"><span class="pre">sort_boot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_created"><code class="docutils literal notranslate"><span class="pre">sort_created()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_crt"><code class="docutils literal notranslate"><span class="pre">sort_crt()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_ip"><code class="docutils literal notranslate"><span class="pre">sort_ip()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_ip6"><code class="docutils literal notranslate"><span class="pre">sort_ip6()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_jid"><code class="docutils literal notranslate"><span class="pre">sort_jid()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_key"><code class="docutils literal notranslate"><span class="pre">sort_key()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_name"><code class="docutils literal notranslate"><span class="pre">sort_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_qta"><code class="docutils literal notranslate"><span class="pre">sort_qta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_release"><code class="docutils literal notranslate"><span class="pre">sort_release()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_res"><code class="docutils literal notranslate"><span class="pre">sort_res()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_state"><code class="docutils literal notranslate"><span class="pre">sort_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_template"><code class="docutils literal notranslate"><span class="pre">sort_template()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_type"><code class="docutils literal notranslate"><span class="pre">sort_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.sort_use"><code class="docutils literal notranslate"><span class="pre">sort_use()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.tempfile"><code class="docutils literal notranslate"><span class="pre">tempfile()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.tmp_dataset_checks"><code class="docutils literal notranslate"><span class="pre">tmp_dataset_checks()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.truthy_inverse_values"><code class="docutils literal notranslate"><span class="pre">truthy_inverse_values()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.truthy_values"><code class="docutils literal notranslate"><span class="pre">truthy_values()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.try_convert"><code class="docutils literal notranslate"><span class="pre">try_convert()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_common.validate_plugin_manifest"><code class="docutils literal notranslate"><span class="pre">validate_plugin_manifest()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_create">iocage_lib.ioc_create module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_create.IOCCreate"><code class="docutils literal notranslate"><span class="pre">IOCCreate</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_create.IOCCreate.create_config"><code class="docutils literal notranslate"><span class="pre">IOCCreate.create_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_create.IOCCreate.create_install_packages"><code class="docutils literal notranslate"><span class="pre">IOCCreate.create_install_packages()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_create.IOCCreate.create_jail"><code class="docutils literal notranslate"><span class="pre">IOCCreate.create_jail()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_create.IOCCreate.create_rc"><code class="docutils literal notranslate"><span class="pre">IOCCreate.create_rc()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_create.IOCCreate.create_thickjail"><code class="docutils literal notranslate"><span class="pre">IOCCreate.create_thickjail()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_debug">iocage_lib.ioc_debug module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_debug.IOCDebug"><code class="docutils literal notranslate"><span class="pre">IOCDebug</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_debug.IOCDebug.run_debug"><code class="docutils literal notranslate"><span class="pre">IOCDebug.run_debug()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_debug.IOCDebug.run_host_debug"><code class="docutils literal notranslate"><span class="pre">IOCDebug.run_host_debug()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_debug.IOCDebug.run_jail_debug"><code class="docutils literal notranslate"><span class="pre">IOCDebug.run_jail_debug()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_destroy">iocage_lib.ioc_destroy module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_destroy.IOCDestroy"><code class="docutils literal notranslate"><span class="pre">IOCDestroy</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_destroy.IOCDestroy.destroy_jail"><code class="docutils literal notranslate"><span class="pre">IOCDestroy.destroy_jail()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_exceptions">iocage_lib.ioc_exceptions module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.CommandFailed"><code class="docutils literal notranslate"><span class="pre">CommandFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.CommandNeedsRoot"><code class="docutils literal notranslate"><span class="pre">CommandNeedsRoot</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.ExceptionWithMsg"><code class="docutils literal notranslate"><span class="pre">ExceptionWithMsg</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.Exists"><code class="docutils literal notranslate"><span class="pre">Exists</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.JailCorruptConfiguration"><code class="docutils literal notranslate"><span class="pre">JailCorruptConfiguration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.JailMisconfigured"><code class="docutils literal notranslate"><span class="pre">JailMisconfigured</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.JailMissingConfiguration"><code class="docutils literal notranslate"><span class="pre">JailMissingConfiguration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.JailRunning"><code class="docutils literal notranslate"><span class="pre">JailRunning</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.PoolNotActivated"><code class="docutils literal notranslate"><span class="pre">PoolNotActivated</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.ValidationFailed"><code class="docutils literal notranslate"><span class="pre">ValidationFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.ValueNotFound"><code class="docutils literal notranslate"><span class="pre">ValueNotFound</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exceptions.ignore_exceptions"><code class="docutils literal notranslate"><span class="pre">ignore_exceptions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_exec">iocage_lib.ioc_exec module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exec.IOCExec"><code class="docutils literal notranslate"><span class="pre">IOCExec</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exec.IOCExec.exec_jail"><code class="docutils literal notranslate"><span class="pre">IOCExec.exec_jail()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exec.IOCExec.flight_checks"><code class="docutils literal notranslate"><span class="pre">IOCExec.flight_checks()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exec.InteractiveExec"><code class="docutils literal notranslate"><span class="pre">InteractiveExec</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_exec.SilentExec"><code class="docutils literal notranslate"><span class="pre">SilentExec</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_fetch">iocage_lib.ioc_fetch module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch"><code class="docutils literal notranslate"><span class="pre">IOCFetch</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch.fetch_download"><code class="docutils literal notranslate"><span class="pre">IOCFetch.fetch_download()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch.fetch_extract"><code class="docutils literal notranslate"><span class="pre">IOCFetch.fetch_extract()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch.fetch_http_release"><code class="docutils literal notranslate"><span class="pre">IOCFetch.fetch_http_release()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch.fetch_release"><code class="docutils literal notranslate"><span class="pre">IOCFetch.fetch_release()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch.fetch_update"><code class="docutils literal notranslate"><span class="pre">IOCFetch.fetch_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fetch.IOCFetch.update_progress"><code class="docutils literal notranslate"><span class="pre">IOCFetch.update_progress()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_fstab">iocage_lib.ioc_fstab module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab"><code class="docutils literal notranslate"><span class="pre">Fstab</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_file"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_file</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_freq"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_freq</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_mntops"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_mntops</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_passno"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_passno</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_spec"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_type"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.Fstab.fs_vfstype"><code class="docutils literal notranslate"><span class="pre">Fstab.fs_vfstype</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.IOCFstab"><code class="docutils literal notranslate"><span class="pre">IOCFstab</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_fstab.IOCFstab.fstab_list"><code class="docutils literal notranslate"><span class="pre">IOCFstab.fstab_list()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_image">iocage_lib.ioc_image module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_image.IOCImage"><code class="docutils literal notranslate"><span class="pre">IOCImage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_image.IOCImage.export_jail"><code class="docutils literal notranslate"><span class="pre">IOCImage.export_jail()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_image.IOCImage.import_jail"><code class="docutils literal notranslate"><span class="pre">IOCImage.import_jail()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_json">iocage_lib.ioc_json module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.backup_iocage_jail_conf"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.backup_iocage_jail_conf()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.check_config"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.check_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.check_default_config"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.check_default_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.check_jail_config"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.check_jail_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.fix_properties"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.fix_properties()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.get_mac_prefix"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.get_mac_prefix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.get_pool_and_iocroot"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.get_pool_and_iocroot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.get_version"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.get_version()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.json_write"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.json_write()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.retrieve_default_props"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.retrieve_default_props()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCConfiguration.validate_mac_prefix"><code class="docutils literal notranslate"><span class="pre">IOCConfiguration.validate_mac_prefix()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCCpuset"><code class="docutils literal notranslate"><span class="pre">IOCCpuset</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCCpuset.retrieve_cpu_sets"><code class="docutils literal notranslate"><span class="pre">IOCCpuset.retrieve_cpu_sets()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCCpuset.set_cpuset"><code class="docutils literal notranslate"><span class="pre">IOCCpuset.set_cpuset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCCpuset.validate_cpuset_prop"><code class="docutils literal notranslate"><span class="pre">IOCCpuset.validate_cpuset_prop()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson"><code class="docutils literal notranslate"><span class="pre">IOCJson</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.default_only_props"><code class="docutils literal notranslate"><span class="pre">IOCJson.default_only_props</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.get_full_config"><code class="docutils literal notranslate"><span class="pre">IOCJson.get_full_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_check_prop"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_check_prop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_convert_from_ucl"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_convert_from_ucl()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_convert_from_zfs"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_convert_from_zfs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_get_value"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_get_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_load"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_load()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_migrate_uuid_to_tag"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_migrate_uuid_to_tag()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_plugin_get_value"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_plugin_get_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_plugin_load"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_plugin_load()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_plugin_set_value"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_plugin_set_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.json_set_value"><code class="docutils literal notranslate"><span class="pre">IOCJson.json_set_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCJson.truthy_props"><code class="docutils literal notranslate"><span class="pre">IOCJson.truthy_props</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL"><code class="docutils literal notranslate"><span class="pre">IOCRCTL</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL.rctl_rules_exist"><code class="docutils literal notranslate"><span class="pre">IOCRCTL.rctl_rules_exist()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL.remove_rctl_rules"><code class="docutils literal notranslate"><span class="pre">IOCRCTL.remove_rctl_rules()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL.set_rctl_rules"><code class="docutils literal notranslate"><span class="pre">IOCRCTL.set_rctl_rules()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL.types"><code class="docutils literal notranslate"><span class="pre">IOCRCTL.types</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL.validate_rctl_props"><code class="docutils literal notranslate"><span class="pre">IOCRCTL.validate_rctl_props()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.IOCRCTL.validate_rctl_tunable"><code class="docutils literal notranslate"><span class="pre">IOCRCTL.validate_rctl_tunable()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.JailRuntimeConfiguration"><code class="docutils literal notranslate"><span class="pre">JailRuntimeConfiguration</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.JailRuntimeConfiguration.normalize_data"><code class="docutils literal notranslate"><span class="pre">JailRuntimeConfiguration.normalize_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.JailRuntimeConfiguration.path"><code class="docutils literal notranslate"><span class="pre">JailRuntimeConfiguration.path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.JailRuntimeConfiguration.remove"><code class="docutils literal notranslate"><span class="pre">JailRuntimeConfiguration.remove()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.JailRuntimeConfiguration.set"><code class="docutils literal notranslate"><span class="pre">JailRuntimeConfiguration.set()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_json.JailRuntimeConfiguration.sync_changes"><code class="docutils literal notranslate"><span class="pre">JailRuntimeConfiguration.sync_changes()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_list">iocage_lib.ioc_list module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_list.IOCList"><code class="docutils literal notranslate"><span class="pre">IOCList</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_list.IOCList.list_all"><code class="docutils literal notranslate"><span class="pre">IOCList.list_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_list.IOCList.list_all_quick"><code class="docutils literal notranslate"><span class="pre">IOCList.list_all_quick()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_list.IOCList.list_bases"><code class="docutils literal notranslate"><span class="pre">IOCList.list_bases()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_list.IOCList.list_datasets"><code class="docutils literal notranslate"><span class="pre">IOCList.list_datasets()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_list.IOCList.list_get_jid"><code class="docutils literal notranslate"><span class="pre">IOCList.list_get_jid()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_plugin">iocage_lib.ioc_plugin module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin"><code class="docutils literal notranslate"><span class="pre">IOCPlugin</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.DEFAULT_PROPS"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.DEFAULT_PROPS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.PLUGIN_VERSION"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.PLUGIN_VERSION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.expand_abi_with_specified_release"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.expand_abi_with_specified_release()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.fetch_plugin"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.fetch_plugin()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.fetch_plugin_index"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.fetch_plugin_index()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.fetch_plugin_packagesites"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.fetch_plugin_packagesites()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.fetch_plugin_versions"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.fetch_plugin_versions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.fetch_plugin_versions_from_plugin_index"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.fetch_plugin_versions_from_plugin_index()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.pull_clone_git_repo"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.pull_clone_git_repo()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.retrieve_plugin_index_data"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.retrieve_plugin_index_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.retrieve_plugin_json"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.retrieve_plugin_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.start_rc"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.start_rc()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.stop_rc"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.stop_rc()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.update"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_plugin.IOCPlugin.upgrade"><code class="docutils literal notranslate"><span class="pre">IOCPlugin.upgrade()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_start">iocage_lib.ioc_start module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart"><code class="docutils literal notranslate"><span class="pre">IOCStart</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.check_aliases"><code class="docutils literal notranslate"><span class="pre">IOCStart.check_aliases()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.find_bridge_mtu"><code class="docutils literal notranslate"><span class="pre">IOCStart.find_bridge_mtu()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.get_bridge_members"><code class="docutils literal notranslate"><span class="pre">IOCStart.get_bridge_members()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.get_default_gateway"><code class="docutils literal notranslate"><span class="pre">IOCStart.get_default_gateway()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.get_default_interface"><code class="docutils literal notranslate"><span class="pre">IOCStart.get_default_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.start_copy_localtime"><code class="docutils literal notranslate"><span class="pre">IOCStart.start_copy_localtime()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.start_generate_resolv"><code class="docutils literal notranslate"><span class="pre">IOCStart.start_generate_resolv()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.start_network"><code class="docutils literal notranslate"><span class="pre">IOCStart.start_network()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.start_network_interface_vnet"><code class="docutils literal notranslate"><span class="pre">IOCStart.start_network_interface_vnet()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.start_network_vnet_addr"><code class="docutils literal notranslate"><span class="pre">IOCStart.start_network_vnet_addr()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_start.IOCStart.start_network_vnet_iface"><code class="docutils literal notranslate"><span class="pre">IOCStart.start_network_vnet_iface()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_stop">iocage_lib.ioc_stop module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_stop.IOCStop"><code class="docutils literal notranslate"><span class="pre">IOCStop</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.ioc_upgrade">iocage_lib.ioc_upgrade module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_upgrade.IOCUpgrade"><code class="docutils literal notranslate"><span class="pre">IOCUpgrade</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_upgrade.IOCUpgrade.upgrade_basejail"><code class="docutils literal notranslate"><span class="pre">IOCUpgrade.upgrade_basejail()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.ioc_upgrade.IOCUpgrade.upgrade_jail"><code class="docutils literal notranslate"><span class="pre">IOCUpgrade.upgrade_jail()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib.iocage">iocage_lib.iocage module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage"><code class="docutils literal notranslate"><span class="pre">IOCage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.activate"><code class="docutils literal notranslate"><span class="pre">IOCage.activate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.chroot"><code class="docutils literal notranslate"><span class="pre">IOCage.chroot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.clean"><code class="docutils literal notranslate"><span class="pre">IOCage.clean()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.create"><code class="docutils literal notranslate"><span class="pre">IOCage.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.deactivate"><code class="docutils literal notranslate"><span class="pre">IOCage.deactivate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.debug"><code class="docutils literal notranslate"><span class="pre">IOCage.debug()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.destroy_jail"><code class="docutils literal notranslate"><span class="pre">IOCage.destroy_jail()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.destroy_release"><code class="docutils literal notranslate"><span class="pre">IOCage.destroy_release()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.df"><code class="docutils literal notranslate"><span class="pre">IOCage.df()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.exec"><code class="docutils literal notranslate"><span class="pre">IOCage.exec()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.exec_all"><code class="docutils literal notranslate"><span class="pre">IOCage.exec_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.export"><code class="docutils literal notranslate"><span class="pre">IOCage.export()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.fetch"><code class="docutils literal notranslate"><span class="pre">IOCage.fetch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.fstab"><code class="docutils literal notranslate"><span class="pre">IOCage.fstab()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.get"><code class="docutils literal notranslate"><span class="pre">IOCage.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.import_"><code class="docutils literal notranslate"><span class="pre">IOCage.import_()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.list"><code class="docutils literal notranslate"><span class="pre">IOCage.list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.rename"><code class="docutils literal notranslate"><span class="pre">IOCage.rename()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.reset_cache"><code class="docutils literal notranslate"><span class="pre">IOCage.reset_cache()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.restart"><code class="docutils literal notranslate"><span class="pre">IOCage.restart()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.rollback"><code class="docutils literal notranslate"><span class="pre">IOCage.rollback()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.set"><code class="docutils literal notranslate"><span class="pre">IOCage.set()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.snap_list"><code class="docutils literal notranslate"><span class="pre">IOCage.snap_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.snap_remove"><code class="docutils literal notranslate"><span class="pre">IOCage.snap_remove()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.snapshot"><code class="docutils literal notranslate"><span class="pre">IOCage.snapshot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.start"><code class="docutils literal notranslate"><span class="pre">IOCage.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.stop"><code class="docutils literal notranslate"><span class="pre">IOCage.stop()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.update"><code class="docutils literal notranslate"><span class="pre">IOCage.update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.update_all"><code class="docutils literal notranslate"><span class="pre">IOCage.update_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.upgrade"><code class="docutils literal notranslate"><span class="pre">IOCage.upgrade()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.IOCage.upgrade_all"><code class="docutils literal notranslate"><span class="pre">IOCage.upgrade_all()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.PoolAndDataset"><code class="docutils literal notranslate"><span class="pre">PoolAndDataset</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.PoolAndDataset.get_iocroot"><code class="docutils literal notranslate"><span class="pre">PoolAndDataset.get_iocroot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="iocage_lib.html#iocage_lib.iocage.PoolAndDataset.get_pool"><code class="docutils literal notranslate"><span class="pre">PoolAndDataset.get_pool()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iocage_lib.html#module-iocage_lib">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="setup.html">setup module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tests.html">tests package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tests.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tests.html#tests-conftest-module">tests.conftest module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tests.html#tests-data-classes-module">tests.data_classes module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tests.html#module-contents">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+        </div>
+        <div class="sidebar">
+          
+          <h3>Table of Contents</h3>
+          <ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Install iocage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basic-use.html">Basic Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a></li>
+<li class="toctree-l1"><a class="reference internal" href="networking.html">Networking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jailtypes.html">Jail Types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="best-practices.html">Best Practices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-use.html">Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="templates.html">Using Templates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="debian.html">Create a Debian Buster Jail (native Linux)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known-issues.html">Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+</ul>
+
+          <div role="search">
+            <h3 style="margin-top: 1.5em;">Search</h3>
+            <form class="search" action="search.html" method="get">
+                <input type="text" name="q" />
+                <input type="submit" value="Go" />
+            </form>
+          </div>
+
+        </div>
+        <div class="clearer"></div>
+      </div>
+    </div>
+
+    <div class="footer-wrapper">
+      <div class="footer">
+        <div class="left">
+          <div role="navigation" aria-label="related navigaton">
+            <a href="py-modindex.html" title="Python Module Index"
+              >modules</a> |
+            <a href="genindex.html" title="General Index"
+              >index</a>
+          </div>
+          <div role="note" aria-label="source link">
+          </div>
+        </div>
+
+        <div class="right">
+          
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2014-2019, iocage.
+    </div>
+        </div>
+        <div class="clearer"></div>
+      </div>
+    </div>
+
+  </body>
+</html>

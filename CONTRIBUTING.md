@@ -73,4 +73,4 @@ x = max(
 
 ## Documentation for Read The Docs
 
-If you wish to update some of our [documentation](http://iocage.readthedocs.org), you only need to submit a PR for the files you change in iocage/doc/source. They will automatically be updated when the changes are merged.
+If you wish to update some of our [documentation](https://freebsd.github.io/iocage/), you only need to submit a PR for the files you change in iocage/doc/source. They will automatically be updated when the changes are merged.

@@ -50,7 +50,7 @@ def cli(header, jail, _long, _sort):
         cols.extend(["NAME", "CREATED", "RSIZE", "USED"])
         table.header(cols)
         # We get an infinite float otherwise.
-        table.set_cols_dtype(["t"]*len(cols))
+        table.set_cols_dtype(["t"] * len(cols))
         table.add_rows(snap_list, header=False)
         ioc_common.logit({
             "level"  : "INFO",

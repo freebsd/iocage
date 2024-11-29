@@ -1025,9 +1025,9 @@ def gen_nat_ip(ip_prefix):
     inuse = get_used_ips()
 
     for i in range(256):
-        for l in range(1, 256, 4):
+        for j in range(1, 256, 4):
             network = ipaddress.IPv4Network(
-                f'{ip_prefix}.{i}.{l}/30', strict=False
+                f'{ip_prefix}.{i}.{j}/30', strict=False
             )
             pair = [_ip.exploded for _ip in network.hosts()]
 

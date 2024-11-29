@@ -35,7 +35,7 @@ class Pool(Resource):
     def activate_pool(self):
         if self.health != 'ONLINE':
             raise PoolNotActivated(
-                f'Please check pool status, it should be ONLINE'
+                'Please check pool status, it should be ONLINE'
             )
 
         Dataset(self.name).set_property(IOCAGE_POOL_PROP, 'yes')

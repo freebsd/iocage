@@ -132,4 +132,3 @@ class IOCCheck(object):
                                f"exec={prop} (should be on)"
                 },
                     _callback=self.callback)
-

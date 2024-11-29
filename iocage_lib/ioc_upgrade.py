@@ -79,15 +79,16 @@ class IOCUpgrade:
             'HOME': '/',
             'TERM': 'xterm-256color'
         }
-        for envvar in [ 'HTTP_PROXY','HTTPS_PROXY','HTTP_PROXY_AUTH','NO_PROXY' ]:
+        for envvar in ['HTTP_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY_AUTH', 'NO_PROXY']:
             if os.environ.get(envvar, '') != '':
-                upgrade_env[envvar] = os.environ.get(envvar)
+                self.upgrade_env[envvar] = os.environ.get(envvar)
 
         self.callback = callback
 
         # symbolic link created on fetch by freebsd-update
         bd_hash = hashlib.sha256((self.path + '\n').encode('utf-8')).hexdigest()
-        self.freebsd_install_link = os.path.join(self.path,
+        self.freebsd_install_link = os.path.join(
+            self.path,
             'var/db/freebsd-update', bd_hash + '-install')
 
     def upgrade_jail(self):
@@ -108,7 +109,7 @@ class IOCUpgrade:
         tmp = None
         try:
             fetched_update = f"{self.iocroot}/releases/{self.new_release}" \
-                    f"/root/usr/sbin/freebsd-update"
+                f"/root/usr/sbin/freebsd-update"
             if os.path.isfile(fetched_update):
                 fbsd_update = fetched_update
             else:
@@ -163,14 +164,14 @@ class IOCUpgrade:
                     silent=self.silent
                 )
 
-            for _ in range(50): # up to 50 invocations to prevent runaway
+            for _ in range(50):     # up to 50 invocations to prevent runaway
                 if os.path.islink(self.freebsd_install_link):
                     self.__upgrade_install__(fbsd_update)
                 else:
                     break
 
             if os.path.islink(self.freebsd_install_link):
-                msg = f'Upgrade failed, freebsd-update won\'t finish!'
+                msg = 'Upgrade failed, freebsd-update won\'t finish!'
                 iocage_lib.ioc_common.logit(
                     {
                         'level': 'EXCEPTION',

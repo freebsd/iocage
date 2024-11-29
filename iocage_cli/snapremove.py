@@ -34,14 +34,14 @@ import iocage_lib.iocage as ioc
 @click.option("--name", "-n", help="The snapshot name. This will be what comes"
                                    " after @", required=True)
 @click.option("--force", "-f", is_flag=True, default=False,
-    help="Force removal (required for -n ALL)")
+              help="Force removal (required for -n ALL)")
 def cli(jail, name, force):
     """Removes a snapshot from a user supplied jail."""
     if name == 'ALL' and not force:
         ioc_common.logit({
-                    "level": "EXCEPTION",
-                    "message": 'Usage: iocage snapremove [OPTIONS] JAILS...\n'
-                               '\nError: Mass snapshot deletion requires "force" (-f).'
-                })
+            "level": "EXCEPTION",
+            "message": 'Usage: iocage snapremove [OPTIONS] JAILS...\n'
+                       '\nError: Mass snapshot deletion requires "force" (-f).'
+        })
     skip_jails = jail != 'ALL'
     ioc.IOCage(jail=jail, skip_jails=skip_jails).snap_remove(name)

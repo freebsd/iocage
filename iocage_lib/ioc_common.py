@@ -416,30 +416,7 @@ def sort_release(releases, split=False, fetch_releases=False):
     release_list = []
     list_sort = False
 
-    try:
-        # Length 9 (standard) or 10 (plugins) is list -l,
-        # Length 5 is list
-
-        length = len(releases)
-
-        if fetch_releases:
-            pass
-        elif length == 9 or length == 10:
-            # Attempt to split off the -p* stuff.
-            try:
-                _release, _patch = releases[5].rsplit("-p", 1)
-            except ValueError:
-                _release = releases[5]
-                _patch = 0
-            list_sort = True
-        elif length == 5:
-            _release = releases[3]
-            _patch = 0
-            list_sort = True
-    except TypeError:
-        # This is list -r
-        pass
-
+    # This is list -r
     if split:
         for i, rel in enumerate(releases):
             try:
@@ -461,6 +438,25 @@ def sort_release(releases, split=False, fetch_releases=False):
             # enumeration ensures 11.2-LOCAL does not take the place of 11.2-R
             r_dict[f'{rel}_{i}'] = r_type
     else:
+        # Length 9 (standard) or 10 (plugins) is list -l,
+        # Length 5 is list
+
+        length = len(releases)
+
+        if fetch_releases:
+            pass
+        elif length == 9 or length == 10:
+            # Attempt to split off the -p* stuff.
+            try:
+                _release, _patch = releases[5].rsplit("-p", 1)
+            except ValueError:
+                _release = releases[5]
+                _patch = 0
+            list_sort = True
+        elif length == 5:
+            _release = releases[3]
+            _patch = 0
+            list_sort = True
         if list_sort:
             _release = _release.split("-", 1)
             try:

@@ -1462,9 +1462,9 @@ class IOCStart(object):
                 entries = {
                     k: v.replace("'", '').replace('"', '')
                     for k, v in map(
-                        lambda l: [e.strip() for e in l.strip().split('=', 1)],
+                        lambda j: [e.strip() for e in j.strip().split('=', 1)],
                         filter(
-                            lambda l: not l.strip().startswith('#') and '=' in l, f.readlines()
+                            lambda j: not j.strip().startswith('#') and '=' in j, f.readlines()
                         )
                     )
                 }
@@ -1498,7 +1498,7 @@ class IOCStart(object):
         su.run(
             [
                 'sysrc', '-f', f'{self.path}/root/etc/rc.conf',
-                f'rtsold_enable=YES'
+                'rtsold_enable=YES'
             ],
             stdout=su.PIPE
         )

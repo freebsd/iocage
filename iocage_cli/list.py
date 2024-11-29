@@ -93,7 +93,7 @@ def cli(dataset_type, header, _long, remote, http, plugins, _sort, quick,
                 else:
                     ioc_common.logit({
                         "level": "INFO",
-                        "message": "\t".join(map(str,item))
+                        "message": "\t".join(map(str, item))
                     })
     else:
         ioc_common.logit({"level": "INFO", "message": _list})

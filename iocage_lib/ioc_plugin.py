@@ -1232,7 +1232,7 @@ fingerprint: {fingerprint}
                 iocage_lib.ioc_common.consume_and_log(
                     _exec,
                     callback=self.callback,
-                    log=not(self.silent)
+                    log=not (self.silent)
                 )
         except iocage_lib.ioc_exceptions.CommandFailed as e:
             self.__rollback_jail__(name="update")

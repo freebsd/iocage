@@ -958,7 +958,7 @@ class IOCCreate(object):
                         iocage_lib.ioc_common.consume_and_log(
                             _exec,
                             callback=self.callback,
-                            log=not(self.silent)
+                            log=not (self.silent)
                         )
                 except iocage_lib.ioc_exceptions.CommandFailed as e:
                     nonempty_lines = [line.rstrip() for line in e.message if line.rstrip()]

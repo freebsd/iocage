@@ -42,7 +42,7 @@ __rootcmd__ = True
     "--server", "-s", default="download.freebsd.org",
     help="Server to fetch from."
 )
-@click.option( 
+@click.option(
     "--verify/--noverify", "-V/-NV", default=True,
     help="Enable or disable verifying SSL cert for HTTP fetching."
 )

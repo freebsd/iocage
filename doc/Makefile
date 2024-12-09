@@ -55,6 +55,7 @@ html:
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 	@rm -rf ../docs
 	cp -r $(BUILDDIR)/html ../docs
+	touch ../docs/.nojekyll
 
 .PHONY: dirhtml
 dirhtml:

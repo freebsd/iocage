@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>iocage_lib package &#8212; iocage 1.9 documentation</title>
+    <title>iocage_lib package &#8212; iocage 1.10 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/agogo.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -21,7 +21,7 @@
     <div class="header-wrapper" role="banner">
       <div class="header">
         <div class="headertitle"><a
-          href="index.html">iocage 1.9 documentation</a></div>
+          href="index.html">iocage 1.10 documentation</a></div>
         <div class="rel" role="navigation" aria-label="related navigation">
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |
@@ -738,6 +738,11 @@ Original source: <a class="reference external" href="https://stackoverflow.com/a
 
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="iocage_lib.ioc_fetch.untar_release_filter">
+<span class="sig-prename descclassname"><span class="pre">iocage_lib.ioc_fetch.</span></span><span class="sig-name descname"><span class="pre">untar_release_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">member</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.ioc_fetch.untar_release_filter" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </section>
 <section id="module-iocage_lib.ioc_fstab">
 <span id="iocage-lib-ioc-fstab-module"></span><h2>iocage_lib.ioc_fstab module<a class="headerlink" href="#module-iocage_lib.ioc_fstab" title="Permalink to this heading">¶</a></h2>
@@ -1270,7 +1275,7 @@ actually run the correct function, otherwise it passes.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>nic_defs</strong> – comma separated interface definitions (nic, bridge)</p></li>
+<li><p><strong>nic_defs</strong> – comma separated interface definitions (nic:bridge, nic:bridge…)</p></li>
 <li><p><strong>net_configs</strong> – Tuple of IP address and router pairs</p></li>
 <li><p><strong>jid</strong> – The jails ID</p></li>
 </ul>
@@ -1491,16 +1496,31 @@ call IOCage with skip_jails=True</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.snap_list_all">
+<span class="sig-name descname"><span class="pre">snap_list_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">long</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_sort</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.snap_list_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.snap_remove">
-<span class="sig-name descname"><span class="pre">snap_remove</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.snap_remove" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">snap_remove</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cloned_datasets</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.snap_remove" title="Permalink to this definition">¶</a></dt>
 <dd><p>Removes user supplied snapshot from jail</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.snap_remove_all">
+<span class="sig-name descname"><span class="pre">snap_remove_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">snapshot</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.snap_remove_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.snapshot">
 <span class="sig-name descname"><span class="pre">snapshot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.snapshot" title="Permalink to this definition">¶</a></dt>
 <dd><p>Will create a snapshot for the given jail</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.snapshot_all">
+<span class="sig-name descname"><span class="pre">snapshot_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.snapshot_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.start">
@@ -1516,7 +1536,7 @@ call IOCage with skip_jails=True</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="iocage_lib.iocage.IOCage.update">
-<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pkgs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.update" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pkgs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#iocage_lib.iocage.IOCage.update" title="Permalink to this definition">¶</a></dt>
 <dd><p>Updates a jail to the latest patchset.</p>
 </dd></dl>
 

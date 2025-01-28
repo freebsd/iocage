@@ -1095,6 +1095,7 @@ def parse_package_name(pkg):
 
 
 def get_host_gateways():
+    default_gw_labels = ('default', '0.0.0.0', '::/')
     gateways = {'ipv4': {'gateway': None, 'interface': None},
                 'ipv6': {'gateway': None, 'interface': None}}
     af_mapping = {
@@ -1116,7 +1117,7 @@ def get_host_gateways():
             pass
         else:
             default_route = list(filter(
-                lambda x: x['destination'] in ['default', '0.0.0.0', '::/0'], route_entries)
+                lambda x: x['destination'] in default_gw_labels, route_entries)
             )
             if default_route and 'gateway' in default_route[0]:
                 gateways[af_mapping[af]]['gateway'] = \

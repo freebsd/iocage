@@ -1561,7 +1561,7 @@ class IOCJson(IOCConfiguration):
                     iocage_lib.ioc_common.logit(
                         {
                             'level': 'EXCEPTION',
-                            'message': f'{jail_uuid} is missing it\'s'
+                            'message': f'{jail_uuid} is missing its'
                             ' configuration, please destroy this jail and'
                             ' recreate it.',
                             'suppress_log': self.suppress_log

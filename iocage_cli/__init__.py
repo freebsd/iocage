@@ -68,7 +68,7 @@ def print_version(ctx, param, value):
 
     if not value or ctx.resilient_parsing:
         return
-    print("Version\t1.10")
+    print("Version\t1.11")
     sys.exit()
 
 

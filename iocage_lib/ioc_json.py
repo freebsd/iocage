@@ -2015,9 +2015,14 @@ class IOCJson(IOCConfiguration):
 
                             return
 
-                        iocage_lib.ioc_common.checkoutput(
-                            ["jail", "-m", f"jid={jid}", f"{key}={value}"],
-                            stderr=su.STDOUT)
+                        if key == "cpuset":
+                            iocage_lib.ioc_common.checkoutput(
+                                ["cpuset", "-l", f"{value}", "-j", f"{jid}"],
+                                stderr=su.STDOUT)
+                        else:
+                            iocage_lib.ioc_common.checkoutput(
+                                ["jail", "-m", f"jid={jid}", f"{key}={value}"],
+                                stderr=su.STDOUT)
                     except su.CalledProcessError as err:
                         raise RuntimeError(
                             f"{err.output.decode('utf-8').rstrip()}")

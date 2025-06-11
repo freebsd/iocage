@@ -873,7 +873,7 @@ class IOCStart(object):
         # Running exec_poststart now
         poststart_success, poststart_error = \
             iocage_lib.ioc_common.runscript(
-                f"export JID=ioc-{self.uuid} JNAME={self.uuid};"+exec_poststart
+                exec_poststart
             )
 
         if poststart_error:

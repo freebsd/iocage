@@ -871,9 +871,15 @@ class IOCStart(object):
                 f.write(f'{success}\n{error}')
 
         # Running exec_poststart now
+        _, jid = iocage_lib.ioc_list.IOCList().list_get_jid(self.uuid)
+        post_start_env = {
+            **os.environ,
+            'JID': jid,
+            'JNAME': f"ioc-{self.uuid}",
+        }
         poststart_success, poststart_error = \
             iocage_lib.ioc_common.runscript(
-                f"export JID=ioc-{self.uuid} JNAME={self.uuid};"+exec_poststart
+                exec_poststart, post_start_env
             )
 
         if poststart_error:

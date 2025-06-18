@@ -113,8 +113,8 @@ class IOCUpgrade:
             if os.path.isfile(fetched_update):
                 fbsd_update = fetched_update
             else:
-                f = 'https://raw.githubusercontent.com/freebsd/freebsd-src' \
-                    f'/releng/{f_rel}/usr.sbin/freebsd-update/freebsd-update.sh'
+                f = "https://cgit.freebsd.org/src/plain" \
+                    f"/usr.sbin/freebsd-update/freebsd-update.sh?h=releng/{f_rel}"
                 tmp = tempfile.NamedTemporaryFile(delete=False)
                 with urllib.request.urlopen(f) as http:
                     tmp.write(http.read())

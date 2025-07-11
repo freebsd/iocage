@@ -590,7 +590,6 @@ class IOCStart(object):
                 f'exec.timeout={exec_timeout}',
                 f'stop.timeout={stop_timeout}',
                 f'mount.fstab={self.path}/fstab',
-                'allow.dying',
                 f'exec.consolelog={self.iocroot}/log/ioc-'
                 f'{self.uuid}-console.log',
                 f'ip_hostname={ip_hostname}' if ip_hostname else '',

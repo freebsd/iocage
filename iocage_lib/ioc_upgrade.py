@@ -79,7 +79,11 @@ class IOCUpgrade:
             'HOME': '/',
             'TERM': 'xterm-256color'
         }
-        for envvar in ['HTTP_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY_AUTH', 'NO_PROXY']:
+        if os.environ.get('http_proxy', '') != '':
+            http_proxy_var = 'http_proxy'
+        else:
+            http_proxy_var = 'HTTP_PROXY'
+        for envvar in [http_proxy_var, 'HTTPS_PROXY', 'HTTP_PROXY_AUTH', 'NO_PROXY']:
             if os.environ.get(envvar, '') != '':
                 self.upgrade_env[envvar] = os.environ.get(envvar)
 

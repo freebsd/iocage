@@ -791,7 +791,8 @@ class IOCage:
 
     def exec_all(
         self, command, host_user='root', jail_user=None, console=False,
-        start_jail=False, interactive=False, unjailed=False, msg_return=False
+        start_jail=False, interactive=False, unjailed=False, msg_return=False,
+        keep_proxy=False
     ):
         """Runs exec for all jails"""
         self._all = False
@@ -799,18 +800,19 @@ class IOCage:
             self.jail = jail
             self.exec(
                 command, host_user, jail_user, console, start_jail,
-                interactive, unjailed, msg_return
+                interactive, unjailed, msg_return, keep_proxy
             )
 
     def exec(
         self, command, host_user='root', jail_user=None, console=False,
-        start_jail=False, interactive=False, unjailed=False, msg_return=False
+        start_jail=False, interactive=False, unjailed=False, msg_return=False,
+        keep_proxy=False
     ):
         """Executes a command in the jail as the supplied users."""
         if self._all:
             self.exec_all(
                 command, host_user, jail_user, console, start_jail,
-                interactive, unjailed, msg_return
+                interactive, unjailed, msg_return, keep_proxy
             )
             return
 
@@ -918,6 +920,7 @@ class IOCage:
                 host_user=host_user,
                 jail_user=jail_user,
                 unjailed=pkg,
+                keep_proxy=keep_proxy,
                 skip=True
             )
             return
@@ -930,6 +933,7 @@ class IOCage:
                 host_user=host_user,
                 jail_user=jail_user,
                 unjailed=unjailed,
+                keep_proxy=keep_proxy,
                 su_env=su_env
             ) as _exec:
                 output = ioc_common.consume_and_log(

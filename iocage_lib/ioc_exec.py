@@ -77,7 +77,9 @@ class IOCExec(object):
         su_env.setdefault('TERM', 'xterm-256color')
         su_env.setdefault('LANG', env_lang)
         su_env.setdefault('LC_ALL', env_lang)
-        if os.environ.get('HTTP_PROXY', '') != '':
+        if os.environ.get('http_proxy', '') != '':
+            su_env.setdefault('http_proxy', os.environ.get('http_proxy', ''))
+        elif os.environ.get('HTTP_PROXY', '') != '':
             su_env.setdefault('HTTP_PROXY', os.environ.get('HTTP_PROXY', ''))
         if os.environ.get('HTTP_PROXY_AUTH', '') != '':
             su_env.setdefault('HTTP_PROXY_AUTH', os.environ.get('HTTP_PROXY_AUTH', ''))

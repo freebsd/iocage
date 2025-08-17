@@ -26,7 +26,6 @@ import collections
 import concurrent.futures
 import contextlib
 import datetime
-import distutils.dir_util
 import json
 import logging
 import os
@@ -1188,9 +1187,10 @@ fingerprint: {fingerprint}
                     silent=self.silent
                 )
 
-            distutils.dir_util.copy_tree(
+            shutil.copytree(
                 artifact_path,
-                os.path.join(path, 'plugin')
+                os.path.join(path, 'plugin'),
+                dirs_exist_ok=True
             )
         else:
             self._clone_repo(
@@ -1200,15 +1200,13 @@ fingerprint: {fingerprint}
 
         if os.path.isdir(f"{path}/plugin/overlay/"):
             try:
-                # Quickfix for distutils cache bug making re-installed
-                # plugins with same name fail to copy the overlay folder
-                distutils.dir_util._path_created = {}
-
-                distutils.dir_util.copy_tree(
+                shutil.copytree(
                     f"{path}/plugin/overlay/",
                     f"{path}/root",
-                    preserve_symlinks=True)
-            except distutils.errors.DistutilsFileError as e:
+                    symlinks=True,
+                    dirs_exist_ok=True
+                )
+            except shutil.Error as e:
                 # Copy tree should succeed if the overlay folder exists
                 iocage_lib.ioc_common.logit(
                     {

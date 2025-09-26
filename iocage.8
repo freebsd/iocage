@@ -1212,7 +1212,7 @@ default route inside a VNET jail.
 .It Pf defaultrouter6= Op none | ip6address
 Setting this property to anything other than none configures a
 default IPv6 route inside a VNET jail.
-.It Pf resolver= Op none | nameserver IP;nameserver IP;search domain.local
+.It Pf resolver= Op none | nameserver IP;nameserver IP;search domain.local | /dev/null
 Set the jail's resolver
 .Pq resolv.conf .
 Fields must be delimited with a semicolon.
@@ -1222,6 +1222,9 @@ Semicolons are translated to newlines in
 If the resolver is set to none (default) the jail inherits the
 .Pa resolv.conf
 file from the host.
+.Pp
+If the resolver is set to /dev/null, iocage will not attempt to set the jail's
+.Pa resolv.conf .
 .It ip6_addr, ip6_saddrsel, ip6
 A set of IPv6 options for the prison, the counterparts to ip4_addr,
 ip4_saddrsel and ip4 above.

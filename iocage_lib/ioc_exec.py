@@ -52,6 +52,7 @@ class IOCExec(object):
         skip=False,
         stdin_bytestring=None,
         su_env=None,
+        keep_proxy=False,
         decode=False,
         callback=None
     ):
@@ -77,12 +78,17 @@ class IOCExec(object):
         su_env.setdefault('TERM', 'xterm-256color')
         su_env.setdefault('LANG', env_lang)
         su_env.setdefault('LC_ALL', env_lang)
-        if os.environ.get('HTTP_PROXY', '') != '':
-            su_env.setdefault('HTTP_PROXY', os.environ.get('HTTP_PROXY', ''))
-        if os.environ.get('HTTP_PROXY_AUTH', '') != '':
-            su_env.setdefault('HTTP_PROXY_AUTH', os.environ.get('HTTP_PROXY_AUTH', ''))
-        if os.environ.get('NO_PROXY', '') != '':
-            su_env.setdefault('NO_PROXY', os.environ.get('NO_PROXY', ''))
+        if unjailed or keep_proxy:
+            if os.environ.get('http_proxy', '') != '':
+                su_env.setdefault('http_proxy', os.environ.get('http_proxy', ''))
+            elif os.environ.get('HTTP_PROXY', '') != '':
+                su_env.setdefault('HTTP_PROXY', os.environ.get('HTTP_PROXY', ''))
+            if os.environ.get('HTTPS_PROXY', '') != '':
+                su_env.setdefault('HTTPS_PROXY', os.environ.get('HTTPS_PROXY', ''))
+            if os.environ.get('HTTP_PROXY_AUTH', '') != '':
+                su_env.setdefault('HTTP_PROXY_AUTH', os.environ.get('HTTP_PROXY_AUTH', ''))
+            if os.environ.get('NO_PROXY', '') != '':
+                su_env.setdefault('NO_PROXY', os.environ.get('NO_PROXY', ''))
 
         self.su_env = su_env
         self.callback = callback

@@ -29,7 +29,6 @@ import datetime
 import json
 import logging
 import os
-import git
 import pathlib
 import re
 import shutil
@@ -1519,6 +1518,7 @@ fingerprint: {fingerprint}
     @staticmethod
     def _verify_git_repo(repo_url, destination):
         verified = False
+        import git
         with contextlib.suppress(
             git.exc.InvalidGitRepositoryError,
             git.exc.NoSuchPathError,
@@ -1534,6 +1534,7 @@ fingerprint: {fingerprint}
         """
         This is to replicate the functionality of cloning/pulling a repo
         """
+        import git
         with GIT_LOCK:
             branch = ref
             try:

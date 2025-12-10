@@ -38,8 +38,6 @@ import iocage_lib.ioc_list
 import iocage_lib.ioc_start
 import iocage_lib.ioc_stop
 import iocage_lib.ioc_exceptions
-import dns.resolver
-import dns.exception
 import shutil
 
 from iocage_lib.cache import cache
@@ -763,6 +761,8 @@ class IOCCreate(object):
                 _callback=self.callback,
                 silent=False)
 
+            import dns.resolver
+            import dns.exception
             try:
                 dns.resolver.query(repo)
             except dns.resolver.NoNameservers:

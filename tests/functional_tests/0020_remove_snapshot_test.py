@@ -66,7 +66,7 @@ def test_01_remove_snapshot(invoke_cli, resource_selector, skip_test):
 @require_root
 @require_zpool
 def test_02_remove_snapshot_of_all_jails(
-    invoke_cli, resource_selector, skip_test):
+        invoke_cli, resource_selector, skip_test):
     jails = resource_selector.all_jails
     skip_test(not jails)
 
@@ -93,6 +93,7 @@ def test_02_remove_snapshot_of_all_jails(
 
     assert all(snap.exists is False for snap in remove_snaps)
 
+
 @require_root
 @require_zpool
 def test_03_remove_all_snapshots_fail(invoke_cli, resource_selector, skip_test):
@@ -102,7 +103,7 @@ def test_03_remove_all_snapshots_fail(invoke_cli, resource_selector, skip_test):
     snap_jail = None
     for jail in jails:
         if (not jail.is_template and not jail.is_cloned and
-            len(jail.recursive_snapshots)>0):
+                len(jail.recursive_snapshots) > 0):
             snap_jail = jail
             break
 
@@ -124,14 +125,14 @@ def test_03_remove_all_snapshots_fail(invoke_cli, resource_selector, skip_test):
 @require_root
 @require_zpool
 def test_04_remove_all_snapshots_success(invoke_cli, resource_selector,
-                                        snapshot, skip_test):
+                                         snapshot, skip_test):
     jails = resource_selector.all_jails_having_snapshots
     skip_test(not jails)
 
     snap_jail = None
     for jail in jails:
         if (not jail.is_template and not jail.is_cloned and
-            len(jail.recursive_snapshots)>1):
+                len(jail.recursive_snapshots) > 1):
             snap_jail = jail
             break
 
@@ -160,7 +161,7 @@ def test_04_remove_all_snapshots_success(invoke_cli, resource_selector,
 @require_root
 @require_zpool
 def test_05_remove_all_snapshots_all_jails(invoke_cli, resource_selector,
-                                        snapshot, skip_test):
+                                           snapshot, skip_test):
     jails = resource_selector.all_jails_having_snapshots
     skip_test(not jails)
 

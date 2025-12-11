@@ -126,7 +126,8 @@ def test_01_restart_jail(invoke_cli, resource_selector, skip_test, write_file):
 
 @require_root
 @require_zpool
-def test_02_soft_restart_jail(invoke_cli, resource_selector, skip_test, write_file):
+def test_02_soft_restart_jail(invoke_cli, resource_selector, skip_test,
+                              write_file):
     common_restart_jail(
         invoke_cli, resource_selector, skip_test,
         ['restart', '-s'], write_file
@@ -136,9 +137,8 @@ def test_02_soft_restart_jail(invoke_cli, resource_selector, skip_test, write_fi
 @require_root
 @require_zpool
 def test_03_restart_all_jails(invoke_cli, resource_selector, skip_test):
-    common_restart_all_jails(invoke_cli, resource_selector, skip_test, ['restart'])
-
-
+    common_restart_all_jails(invoke_cli, resource_selector, skip_test,
+                             ['restart'])
 
 
 @require_root

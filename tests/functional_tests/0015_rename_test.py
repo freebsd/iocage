@@ -51,7 +51,8 @@ def test_01_rename_jail(invoke_cli, resource_selector, skip_test, jail):
 
 @require_root
 @require_zpool
-def test_02_rename_template_jail(invoke_cli, resource_selector, skip_test, jail):
+def test_02_rename_template_jail(invoke_cli, resource_selector, skip_test,
+                                 jail):
     jails = resource_selector.template_jails
     skip_test(not jails)
 

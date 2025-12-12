@@ -47,23 +47,24 @@ def test_should_return_mtu_of_first_member_with_description(mock_checkoutput):
                                        mock.call(["ifconfig", "bge0"])])
 
 
-#@mock.patch('iocage_lib.ioc_common.checkoutput')
-#def test_should_return_default_mtu_if_no_members(mock_checkoutput):
-#    mock_checkoutput.side_effect = [bridge_with_no_members_if_config,
-#                                    member_if_config]
+# @mock.patch('iocage_lib.ioc_common.checkoutput')
+# def test_should_return_default_mtu_if_no_members(mock_checkoutput):
+#     mock_checkoutput.side_effect = [bridge_with_no_members_if_config,
+#                                     member_if_config]
 #
-#    # IOCStart.get() is not implemented in test mode. We need it for this test.
-#    # So provide a dummy implementation which gives us the default MTU.
-#    def _mock_iocstart_get(prop):
-#        if prop=='vnet_default_mtu':
-#            return "1500"
-#        raise AttributeError(prop)
+#     # IOCStart.get() is not implemented in test mode.
+#     # We need it for this test.
+#     # So provide a dummy implementation which gives us the default MTU.
+#     def _mock_iocstart_get(prop):
+#         if prop=='vnet_default_mtu':
+#             return "1500"
+#         raise AttributeError(prop)
 #
-#    iocs = ioc_start.IOCStart("", "", unit_test=True)
-#    iocs.get = _mock_iocstart_get
-#    mtu = iocs.find_bridge_mtu('bridge0')
-#    assert mtu == '1500'
-#    mock_checkoutput.called_with(["ifconfig", "bridge0"])
+#     iocs = ioc_start.IOCStart("", "", unit_test=True)
+#     iocs.get = _mock_iocstart_get
+#     mtu = iocs.find_bridge_mtu('bridge0')
+#     assert mtu == '1500'
+#     mock_checkoutput.called_with(["ifconfig", "bridge0"])
 
 
 @mock.patch('iocage_lib.ioc_common.logit')
@@ -96,10 +97,10 @@ def test_should_return_default_interface(mock_logit, test_input, expected):
         assert actual == expected
         mock_logit.assert_not_called()
     else:
-        mock_logit.assert_called_once_with({'level': 'EXCEPTION',
-                                            'message': 'No default interface found'},
-                                           _callback=None,
-                                           silent=False)
+        mock_logit.assert_called_once_with(
+            {'level': 'EXCEPTION', 'message': 'No default interface found'},
+            _callback=None,
+            silent=False)
 
 
 @pytest.mark.parametrize('test_input,expected', [
@@ -141,7 +142,8 @@ def test_should_return_default_gateway(test_input, expected):
     assert iocstart.get_default_gateway('ipv6') == expected['ipv6']
 
 
-bridge_if_config = """bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
+bridge_if_config = """\
+bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
         ether 00:00:00:00:00:00
         nd6 options=1<PERFORMNUD>
         groups: bridge
@@ -152,7 +154,8 @@ bridge_if_config = """bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST
             ifmaxaddr 0 port 1 priority 128 path cost 20000
 """
 
-bridge_with_description_if_config = """bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
+bridge_with_description_if_config = """\
+bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
         description: first-bridge
         ether 00:00:00:00:00:00
         nd6 options=1<PERFORMNUD>
@@ -164,7 +167,8 @@ bridge_with_description_if_config = """bridge0: flags=8843<UP,BROADCAST,RUNNING,
             ifmaxaddr 0 port 1 priority 128 path cost 20000
 """
 
-bridge_with_no_members_if_config = """bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
+bridge_with_no_members_if_config = """\
+bridge0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
         description: first-bridge
         ether 00:00:00:00:00:00
         nd6 options=1<PERFORMNUD>
@@ -174,12 +178,15 @@ bridge_with_no_members_if_config = """bridge0: flags=8843<UP,BROADCAST,RUNNING,S
         root id 00:00:00:00:00:00 priority 32768 ifcost 0 port 0
 """
 
-member_if_config = """bge0: flags=8943<UP,BROADCAST,RUNNING,PROMISC,SIMPLEX,MULTICAST> metric 0 mtu 1500
-        options=c019b<RXCSUM,TXCSUM,VLAN_MTU,VLAN_HWTAGGING,VLAN_HWCSUM,TSO4,VLAN_HWTSO,LINKSTATE>
-        ether 00:00:00:00:00:00
-        inet6 fe80::0000:0000:0000:0000%bge0 prefixlen 64 scopeid 0x1
-        inet 10.2.3.4 netmask 0xffffff00 broadcast 10.2.3.255
-        nd6 options=21<PERFORMNUD,AUTO_LINKLOCAL>
-        media: Ethernet autoselect (1000baseT <full-duplex>)
-        status: active
-"""
+member_if_config = (
+    "bge0: flags=8943<UP,BROADCAST,RUNNING,PROMISC,SIMPLEX,MULTICAST>"
+    " metric 0 mtu 1500\n"
+    "        options=c019b<RXCSUM,TXCSUM,VLAN_MTU,VLAN_HWTAGGING,"
+    "VLAN_HWCSUM,TSO4,VLAN_HWTSO,LINKSTATE>\n"
+    "        ether 00:00:00:00:00:00\n"
+    "        inet6 fe80::0000:0000:0000:0000%bge0 prefixlen 64 scopeid 0x1\n"
+    "        inet 10.2.3.4 netmask 0xffffff00 broadcast 10.2.3.255\n"
+    "        nd6 options=21<PERFORMNUD,AUTO_LINKLOCAL>\n"
+    "        media: Ethernet autoselect (1000baseT <full-duplex>)\n"
+    "        status: active\n"
+    )

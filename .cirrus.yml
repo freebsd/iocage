@@ -1,5 +1,5 @@
 freebsd_instance:
-  image_family: freebsd-14-1
+  image_family: freebsd-15-0-amd64-zfs
 
 iocage_tests_task:
   create_pool_script:
@@ -12,7 +12,7 @@ iocage_tests_task:
     populate_script:
         - pkg fetch -udy git python3 py311-sqlite3 devel/py-libzfs
         - pkg fetch -Udy rust
-        - sed -E 's/([^<>=]+).*/py311-\1/' requirements.txt requirements-test.txt | xargs pkg fetch -Udy
+        - sed -E 's/([^<>=]+).*/py311-\1/' requirements.txt requirements-test.txt | xargs pkg fetch -Udiy
   install_pkgs_script:
     - pkg update
     - pkg install -Uy git python3 py311-sqlite3
@@ -35,7 +35,7 @@ iocage_tests_task:
         - pip
     - name: Use prebuilt packages
       install_python_packages_script:
-        - sed -E 's/([^<>=]+).*/py311-\1/' requirements.txt requirements-test.txt | xargs pkg install -Uy
+        - sed -E 's/([^<>=]+).*/py311-\1/' requirements.txt requirements-test.txt | xargs pkg install -Uyi
         # Necessary as long as py311-pytest and py311-pytest-pep8 conflict
         - python3 -m pip install -r requirements-test.txt
   env_setup_script:

@@ -97,7 +97,7 @@ def test_03_test_force_flag_stopping_jail(
         )
 
         assert jail.running is False
-        assert not os.path.exists(test_file),\
+        assert not os.path.exists(test_file), \
             f'Pre-stop services being executed'
 
     finally:

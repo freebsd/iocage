@@ -434,7 +434,7 @@ class IOCConfiguration:
     @staticmethod
     def get_version():
         """Sets the iocage configuration version."""
-        version = '33'
+        version = '34'
 
         return version
 
@@ -924,6 +924,10 @@ class IOCConfiguration:
         if not conf.get('allow_mount_linsysfs'):
             conf['allow_mount_linsysfs'] = 0
 
+        # Version 34 change default domainname to empty
+        if conf.get('host_domainname') == 'none':
+            conf['host_domainname'] = ''
+
         if not default:
             conf.update(jail_conf)
 
@@ -1133,7 +1137,7 @@ class IOCConfiguration:
         return {
             'CONFIG_VERSION': IOCConfiguration.get_version(),
             'interfaces': 'vnet0:bridge0',
-            'host_domainname': 'none',
+            'host_domainname': '',
             'exec_fib': '0',
             'ip4_addr': 'none',
             'ip4_saddrsel': '1',
@@ -1457,7 +1461,7 @@ class IOCJson(IOCConfiguration):
         # Filter the props we want to convert.
         prop_prefix = "org.freebsd.iocage"
 
-        key_and_value = {"host_domainname": "none"}
+        key_and_value = {"host_domainname": ""}
 
         for key, prop in props.items():
 

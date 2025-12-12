@@ -41,7 +41,7 @@ if os.path.isdir("/".join([sys.prefix, "share/zsh/site-functions/"])):
 if sys.version_info < (3, 8):
     exit("Only Python 3.8 and higher is supported.")
 
-VERSION = '1.11'
+VERSION = '1.12'
 
 setup(
     name='iocage_lib',

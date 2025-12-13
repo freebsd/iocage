@@ -180,7 +180,7 @@ class IOCStart(object):
         localhost_ip = self.conf['localhost_ip']
         self.defaultrouter = self.conf['defaultrouter']
         self.defaultrouter6 = self.conf['defaultrouter6']
-        self.host_gateways = iocage_lib.ioc_common.get_host_gateways()
+        self.host_gateways = iocage_lib.ioc_common.get_host_gateways(self.exec_fib)
 
         fstab_list = []
         with open(

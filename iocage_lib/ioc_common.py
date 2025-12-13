@@ -1094,14 +1094,14 @@ def parse_package_name(pkg):
     }
 
 
-def get_host_gateways():
+def get_host_gateways(fib=0):
     gateways = {'ipv4': {'gateway': None, 'interface': None},
                 'ipv6': {'gateway': None, 'interface': None}}
     af_mapping = {
         'Internet': 'ipv4',
         'Internet6': 'ipv6'
     }
-    output = checkoutput(['netstat', '-r', '-n', '--libxo', 'json'])
+    output = checkoutput(['setfib', f'{fib}', 'netstat', '-r', '-n', '--libxo', 'json'])
     route_families = (json.loads(output)
                       ['statistics']
                       ['route-information']

@@ -36,7 +36,7 @@ import iocage_lib.iocage as ioc
               flag_value="basejail", help="List all basejails.")
 @click.option("--template", "-t", "dataset_type", flag_value="template",
               help="List all templates.")
-@click.option("--header", "-h", "-H", is_flag=True, default=True,
+@click.option("--header", "-h", "-H", flag_value=False, default=True,
               help="For scripting, use tabs for separators.")
 @click.option("--long", "-l", "_long", is_flag=True, default=False,
               help="Show the full uuid and ip4 address.")

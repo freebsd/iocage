@@ -33,7 +33,7 @@ import iocage_lib.iocage as ioc
     max_content_width=400, ), name='get', help='Gets the specified property.')
 @click.argument('prop', required=True, default='')
 @click.argument('jail', required=True, default='')
-@click.option('--header', '-h', '-H', is_flag=True, default=True,
+@click.option('--header', '-h', '-H', flag_value=False, default=True,
               help='For scripting, use tabs for separators.')
 @click.option('--recursive', '-r', help='Get the specified property for all '
                                         'jails.', flag_value='recursive')

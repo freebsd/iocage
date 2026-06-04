@@ -45,7 +45,7 @@ __rootcmd__ = True
               help="Replace an entry by index number", nargs=1)
 @click.option("--list", "-l", "action",
               help="Lists the jails fstab.", flag_value="list")
-@click.option("--header", "-h", "-H", is_flag=True, default=True,
+@click.option("--header", "-h", "-H", flag_value=False, default=True,
               help="For scripting, use tabs for separators.")
 def cli(action, fstab_string, jail, header, replace):
     """

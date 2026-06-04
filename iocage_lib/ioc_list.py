@@ -46,11 +46,11 @@ class IOCList(object):
     """
 
     def __init__(
-        self, lst_type='all', hdr=True, full=False, _sort=None, silent=False,
+        self, lst_type='all', header=True, full=False, _sort=None, silent=False,
         callback=None, plugin=False, quick=False, **kwargs
     ):
         self.list_type = lst_type
-        self.header = hdr
+        self.header = header
         self.full = full
         self.iocjson = iocage_lib.ioc_json.IOCJson()
         self.pool = self.iocjson.pool

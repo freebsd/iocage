@@ -40,6 +40,13 @@ import iocage_lib.ioc_check as ioc_check
 from click import core
 from iocage_lib.ioc_common import set_interactive
 
+import importlib.metadata
+
+try:
+    __version__ = importlib.metadata.version('iocage')
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "0.0"  # Fallback for development mode
+
 core._verify_python3_env = lambda: None
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
@@ -68,7 +75,7 @@ def print_version(ctx, param, value):
 
     if not value or ctx.resilient_parsing:
         return
-    print("Version\t1.12")
+    print("Version\t" + __version__)
     sys.exit()
 
 

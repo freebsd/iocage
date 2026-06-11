@@ -1,0 +1,42 @@
+---
+
+name: Release on tag
+
+on:
+  push:
+    tags:
+      - '*.*'
+
+jobs:
+  gate:
+    name: Check if release tag and version in pyproject.toml match
+    runs-on: ubuntu-latest
+    outputs:
+      tag_existed: ${{ steps.check-tag.outputs.exists }}
+      tagged_version: ${{ steps.computed-tag.outputs.tag }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v6
+      - name: Determine tag/version
+        id: computed-tag
+        run: |
+          set -e
+          TAG=$(cat pyproject.toml \
+            | grep --extended-regexp "^version =" \
+            | grep --extended-regexp --only-matching "[0-9]+\.[0-9]+" \
+            | head --lines=1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Exit if versions do not match
+        if: steps.computed-tag.outputs.tag != github.ref_name
+        run: |
+          echo "Version mismatch:"
+          echo "pyproject.toml: ${{ steps.computed-tag.outputs.tag }}"
+          echo "tagged: ${{ github.ref_name }}"
+          exit 1
+  release:
+    needs: gate
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

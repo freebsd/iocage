@@ -1,0 +1,47 @@
+---
+
+name: Release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.version }}
+      - name: "Build documentation"
+        uses: ammaraskar/sphinx-action@master
+        with:
+          docs-folder: "doc/source/"
+          build-command: >
+            sphinx-build
+            -D version=${{ inputs.version }}
+            -D release=${{ inputs.version }}
+            -b html . ../../docs
+      - uses: ksm2/archive-action@v1
+        env:
+          # node20 is deprecated, force node24 until
+          # the action is updated (there is still a warning)
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          format: "tar.gz"
+          name: "iocage-${{ inputs.version }}"
+      - uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ inputs.version }}
+          artifacts: "iocage-${{ inputs.version }}.tar.gz"
+          generateReleaseNotes: true
+          draft: true
+          # bodyFile: "body.md"

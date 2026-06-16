@@ -7,14 +7,14 @@ Install iocage
 iocage is a jail and container manager merging some of the best features
 and technologies from the FreeBSD operating system. It is geared for
 ease of use with simple command syntax. Visit the
-`iocage github <https://github.com/iocage/iocage>`_ for more information.
+`iocage github <https://github.com/freebsd/iocage>`_ for more information.
 
 Using binary packages
 +++++++++++++++++++++
 
 To install using binary packages on a FreeBSD system, run:
 
-:samp:`sudo pkg install py38-iocage`
+:samp:`sudo pkg install py311-iocage`
 
 Using github
 ++++++++++++
@@ -24,9 +24,9 @@ at :samp:`$SRC_BASE` ( :samp:`/usr/src` by default).
 
 To install from github, run these commands:
 
-:samp:`pkg install python38 git-lite py38-cython py38-libzfs py38-pip`
+:samp:`pkg install python38 git-lite py311-cython py311-libzfs py311-pip`
 
-:samp:`git clone https://github.com/iocage/iocage`
+:samp:`git clone https://github.com/freebsd/iocage`
 
 :samp:`make install` as root.
 
@@ -41,7 +41,7 @@ FreeBSD 10 or above.
 
 To install using pkg(8), run:
 
-:samp:`sudo pkg install py38-iocage`
+:samp:`sudo pkg install py311-iocage`
 
 Building Ports
 ++++++++++++++

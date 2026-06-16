@@ -11,6 +11,7 @@
 .coverage
 venv/
 build/
+docs/
 venv-*/
 .python-version
 .pytest_cache/

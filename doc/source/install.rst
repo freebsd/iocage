@@ -24,7 +24,7 @@ at :samp:`$SRC_BASE` ( :samp:`/usr/src` by default).
 
 To install from github, run these commands:
 
-:samp:`pkg install python38 git-lite py311-cython py311-libzfs py311-pip`
+:samp:`pkg install python git-lite py311-cython py311-libzfs py311-pip`
 
 :samp:`git clone https://github.com/freebsd/iocage`
 

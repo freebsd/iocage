@@ -1182,7 +1182,7 @@ class IOCStart(object):
                 ifaces = ['lo0']
 
                 for addrs, gw, ipv6 in net_configs:
-                    if (
+                    if not ipv6 and (
                         dhcp or 'DHCP' in self.ip4_addr.upper()
                     ) and 'accept_rtadv' not in addrs:
                         # Spoofing IP address, it doesn't matter with DHCP
@@ -1358,7 +1358,7 @@ class IOCStart(object):
             ifconfig = [iface, ip, 'alias']
 
         try:
-            if not wants_dhcp and ip != 'accept_rtadv':
+            if (ipv6 or not wants_dhcp) and ip != 'accept_rtadv':
                 # Jail side
                 iocage_lib.ioc_common.checkoutput(
                     ['setfib', self.exec_fib, 'jexec', f'ioc-{self.uuid}',

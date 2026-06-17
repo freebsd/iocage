@@ -190,3 +190,200 @@ member_if_config = (
     "        media: Ethernet autoselect (1000baseT <full-duplex>)\n"
     "        status: active\n"
     )
+
+
+# ─── Tests for start_network_vnet_addr ───────────────────────────────────────
+#
+# Regression tests for the fix where IPv4 DHCP settings incorrectly
+# prevented static IPv6 addresses from being assigned.
+
+def _make_iocstart_for_addr(**overrides):
+    """Create an IOCStart instance with properties needed for addr tests."""
+    iocstart = ioc_start.IOCStart("test-jail", "", unit_test=True)
+    iocstart.exec_fib = '0'
+    iocstart.ip4_addr = overrides.get('ip4_addr', 'none')
+
+    dhcp_val = overrides.get('dhcp', 0)
+    iocstart.get = lambda prop: dhcp_val if prop == 'dhcp' else 'auto'
+
+    return iocstart
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_ipv6_static_applied_when_dhcp_enabled(mock_checkoutput):
+    """Static IPv6 must be assigned even when IPv4 DHCP is enabled."""
+    iocstart = _make_iocstart_for_addr(dhcp=1)
+    iocstart.start_network_vnet_addr(
+        'vnet0', '2001:db8::1/64', 'fe80::1', ipv6=True
+    )
+    mock_checkoutput.assert_called_once()
+    args = mock_checkoutput.call_args[0][0]
+    assert 'inet6' in args
+    assert '2001:db8::1/64' in args
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_ipv4_skipped_when_dhcp_enabled(mock_checkoutput):
+    """IPv4 ifconfig should be skipped when DHCP is handling it."""
+    iocstart = _make_iocstart_for_addr(dhcp=1)
+    iocstart.start_network_vnet_addr(
+        'vnet0', '192.168.1.10/24', '192.168.1.1', ipv6=False
+    )
+    mock_checkoutput.assert_not_called()
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_ipv4_applied_when_dhcp_disabled(mock_checkoutput):
+    """IPv4 static must be assigned when DHCP is off."""
+    iocstart = _make_iocstart_for_addr(dhcp=0)
+    iocstart.start_network_vnet_addr(
+        'vnet0', '192.168.1.10/24', '192.168.1.1', ipv6=False
+    )
+    mock_checkoutput.assert_called_once()
+    args = mock_checkoutput.call_args[0][0]
+    assert '192.168.1.10/24' in args
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_ipv6_applied_when_dhcp_disabled(mock_checkoutput):
+    """IPv6 static must be assigned when DHCP is off."""
+    iocstart = _make_iocstart_for_addr(dhcp=0)
+    iocstart.start_network_vnet_addr(
+        'vnet0', '2001:db8::1/64', 'fe80::1', ipv6=True
+    )
+    mock_checkoutput.assert_called_once()
+    args = mock_checkoutput.call_args[0][0]
+    assert 'inet6' in args
+    assert '2001:db8::1/64' in args
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_accept_rtadv_never_calls_ifconfig(mock_checkoutput):
+    """accept_rtadv addresses should never invoke ifconfig."""
+    iocstart = _make_iocstart_for_addr(dhcp=0)
+    iocstart.start_network_vnet_addr(
+        'vnet0', 'accept_rtadv', 'fe80::1', ipv6=True
+    )
+    mock_checkoutput.assert_not_called()
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_dhcp_in_ip4_addr_string_skips_ipv4(mock_checkoutput):
+    """ip4_addr containing DHCP should also suppress IPv4 ifconfig."""
+    iocstart = _make_iocstart_for_addr(dhcp=0, ip4_addr='vnet0|DHCP')
+    iocstart.start_network_vnet_addr(
+        'vnet0', '192.168.1.10/24', '192.168.1.1', ipv6=False
+    )
+    mock_checkoutput.assert_not_called()
+
+
+@mock.patch('iocage_lib.ioc_common.checkoutput')
+def test_vnet_addr_dhcp_in_ip4_addr_string_still_applies_ipv6(mock_checkoutput):
+    """ip4_addr containing DHCP must not prevent IPv6 assignment."""
+    iocstart = _make_iocstart_for_addr(dhcp=0, ip4_addr='vnet0|DHCP')
+    iocstart.start_network_vnet_addr(
+        'vnet0', '2001:db8::1/64', 'fe80::1', ipv6=True
+    )
+    mock_checkoutput.assert_called_once()
+    args = mock_checkoutput.call_args[0][0]
+    assert 'inet6' in args
+
+
+# ─── Tests for start_network_interface_vnet address spoofing ─────────────────
+#
+# Regression tests ensuring IPv4 DHCP address spoofing does not affect
+# IPv6 static address entries in net_configs.
+
+def _make_iocstart_for_iface(**overrides):
+    """Create an IOCStart instance with properties needed for iface tests."""
+    iocstart = ioc_start.IOCStart("test-jail", "", unit_test=True)
+    iocstart.exec_fib = '0'
+    iocstart.ip4_addr = overrides.get('ip4_addr', 'vnet0|192.168.1.9')
+    iocstart.ip6_addr = overrides.get(
+        'ip6_addr', 'vnet0|2001:db8::1/64')
+
+    dhcp_val = overrides.get('dhcp', 0)
+    mtu_val = overrides.get('mtu', '1500')
+
+    def mock_get(prop):
+        if prop == 'dhcp':
+            return dhcp_val
+        if prop.endswith('_mtu'):
+            return mtu_val
+        return 'auto'
+
+    iocstart.get = mock_get
+    return iocstart
+
+
+@mock.patch.object(ioc_start.IOCStart, 'start_network_vnet_addr',
+                   return_value=None)
+@mock.patch.object(ioc_start.IOCStart, 'start_network_vnet_iface',
+                   return_value=None)
+def test_iface_vnet_dhcp_does_not_spoof_ipv6_address(
+    mock_iface, mock_addr
+):
+    """When dhcp=1, IPv6 static address must pass through unspoofed."""
+    iocstart = _make_iocstart_for_iface(dhcp=1)
+    net_configs = (
+        (iocstart.ip4_addr, '192.168.1.1', False),
+        (iocstart.ip6_addr, 'fe80::1', True),
+    )
+    iocstart.start_network_interface_vnet('vnet0:bridge0', net_configs, '42')
+
+    # Collect the (ip, ipv6) pairs from all calls to start_network_vnet_addr
+    addr_calls = [(c[0][1], c[0][3]) for c in mock_addr.call_args_list]
+
+    # The IPv6 address must arrive intact (not spoofed to empty)
+    ipv6_calls = [(ip, v6) for ip, v6 in addr_calls if v6]
+    assert len(ipv6_calls) == 1
+    assert ipv6_calls[0][0] == '2001:db8::1/64'
+
+
+@mock.patch.object(ioc_start.IOCStart, 'start_network_vnet_addr',
+                   return_value=None)
+@mock.patch.object(ioc_start.IOCStart, 'start_network_vnet_iface',
+                   return_value=None)
+def test_iface_vnet_dhcp_does_spoof_ipv4_address(
+    mock_iface, mock_addr
+):
+    """When dhcp=1, IPv4 address should be spoofed (DHCP will provide it)."""
+    iocstart = _make_iocstart_for_iface(dhcp=1)
+    net_configs = (
+        (iocstart.ip4_addr, '192.168.1.1', False),
+        (iocstart.ip6_addr, 'fe80::1', True),
+    )
+    iocstart.start_network_interface_vnet('vnet0:bridge0', net_configs, '42')
+
+    addr_calls = [(c[0][1], c[0][3]) for c in mock_addr.call_args_list]
+
+    # The IPv4 address should have been spoofed to empty
+    ipv4_calls = [(ip, v6) for ip, v6 in addr_calls if not v6]
+    assert len(ipv4_calls) == 1
+    assert ipv4_calls[0][0] == "''"
+
+
+@mock.patch.object(ioc_start.IOCStart, 'start_network_vnet_addr',
+                   return_value=None)
+@mock.patch.object(ioc_start.IOCStart, 'start_network_vnet_iface',
+                   return_value=None)
+def test_iface_vnet_no_dhcp_preserves_both_addresses(
+    mock_iface, mock_addr
+):
+    """When dhcp=0, both IPv4 and IPv6 addresses pass through intact."""
+    iocstart = _make_iocstart_for_iface(dhcp=0)
+    net_configs = (
+        (iocstart.ip4_addr, '192.168.1.1', False),
+        (iocstart.ip6_addr, 'fe80::1', True),
+    )
+    iocstart.start_network_interface_vnet('vnet0:bridge0', net_configs, '42')
+
+    addr_calls = [(c[0][1], c[0][3]) for c in mock_addr.call_args_list]
+
+    ipv4_calls = [(ip, v6) for ip, v6 in addr_calls if not v6]
+    ipv6_calls = [(ip, v6) for ip, v6 in addr_calls if v6]
+
+    assert len(ipv4_calls) == 1
+    assert ipv4_calls[0][0] == '192.168.1.9'
+    assert len(ipv6_calls) == 1
+    assert ipv6_calls[0][0] == '2001:db8::1/64'

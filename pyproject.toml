@@ -1,6 +1,6 @@
 [project]
 name = "iocage"
-version = "1.12"
+version = "1.13"
 description = "A jail manager that uses ZFS."
 authors = [
     {name = "iocage Contributors",email = "ports@FreeBSD.org"},

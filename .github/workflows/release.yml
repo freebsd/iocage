@@ -21,10 +21,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.version }}
+          path: iocage-${{ inputs.version }}
       - name: "Build documentation"
         uses: ammaraskar/sphinx-action@master
         with:
-          docs-folder: "doc/source/"
+          docs-folder: iocage-${{ inputs.version }}/doc/source/
           build-command: >
             sphinx-build
             -D version=${{ inputs.version }}

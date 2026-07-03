@@ -27,6 +27,7 @@ import fileinput
 import hashlib
 import os
 import pathlib
+import re
 import subprocess as su
 import tempfile
 import urllib.request
@@ -121,7 +122,10 @@ class IOCUpgrade:
                     f"/usr.sbin/freebsd-update/freebsd-update.sh?h=releng/{f_rel}"
                 tmp = tempfile.NamedTemporaryFile(delete=False)
                 with urllib.request.urlopen(f) as http:
-                    tmp.write(http.read())
+                    # workaround, see https://github.com/freebsd/iocage/pull/133
+                    tmp.write(re.sub("upgrade_check_kmod_ports\n",
+                                     "#upgrade_check_kmod_ports\n",
+                                     http.read().decode()).encode())
                 tmp.close()
                 os.chmod(tmp.name, 0o755)
                 fbsd_update = tmp.name

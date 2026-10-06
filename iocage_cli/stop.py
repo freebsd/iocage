@@ -45,8 +45,16 @@ __rootcmd__ = True
     '--ignore', '-i', default=False, is_flag=True,
     help='Suppress exceptions for jails which fail to stop'
 )
+@click.option(
+    '--parallel', default=False, is_flag=True,
+    help='Stop jails together within each priority group.'
+)
+@click.option(
+    '--jobs', type=click.IntRange(min=1), default=None,
+    help='Limit concurrent stops; requires --parallel. Default: whole group.'
+)
 @click.argument("jails", nargs=-1)
-def cli(rc, force, jails, ignore):
+def cli(rc, force, jails, ignore, parallel, jobs):
     """
     Looks for the jail supplied and passes the uuid, path and configuration
     location to stop_jail.
@@ -58,7 +66,21 @@ def cli(rc, force, jails, ignore):
                        '\nError: Missing argument "jails".'
         })
 
-    if rc:
+    if jobs is not None and not parallel:
+        raise click.UsageError('--jobs requires --parallel')
+
+    if parallel:
+        if rc and jails:
+            raise click.UsageError('--rc cannot be combined with jail names')
+
+        if 'ALL' in jails and len(jails) != 1:
+            raise click.UsageError('ALL cannot be combined with jail names')
+
+        ioc.IOCage(rc=rc, silent=rc).stop(
+            force=force, ignore_exception=ignore, parallel=True,
+            jobs=jobs, jails=jails or None
+        )
+    elif rc:
         ioc.IOCage(rc=rc, silent=True).stop(
             force=force, ignore_exception=ignore
         )

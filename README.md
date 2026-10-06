@@ -76,6 +76,7 @@ relevant. Lines may not be longer then 80 characters.
 - Rapid jail creation within seconds
 - Automatic package installation
 - Virtual networking stacks (vnet)
+- Optional parallel start/stop within priority groups
 - Shared IP based jails (non vnet)
 - Transparent ZFS snapshot management
 - Export and import
@@ -113,6 +114,11 @@ Since SSH won't be available by default, `iocage console myjail` is a useful
 spot to begin configuration of your jail.
 
 To see a list of commands available to you now, type `iocage` outside the jail.
+
+Use `iocage start --parallel ALL` or `iocage stop --parallel ALL` to run
+same-priority jails concurrently. Add `--jobs N` to limit concurrency.
+[Parallel operation and branch testing](doc/source/parallel-start-stop.rst)
+explains dependency rules, boot settings, and a FreeBSD installation trial.
 
 ----
 

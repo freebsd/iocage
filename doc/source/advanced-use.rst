@@ -135,6 +135,11 @@ Boot order can be specified by setting the priority value:
 
 *Lower* values are higher in the boot priority.
 
+Start and stop normally run sequentially. With :literal:`--parallel`, jails
+within a priority group run concurrently, and the entire group finishes before
+the next priority begins. See :ref:`Parallel Start and Stop` for dependency
+rules, worker limits, boot configuration, and testing instructions.
+
 .. index:: Depends Property
 .. _Depends Property:
 

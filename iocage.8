@@ -984,7 +984,25 @@ Options:
 .It Op Fl -rc
 Start all jails with boot=1 in a specific order.
 Jails with lower priority start first.
+.It Op Fl -parallel
+Start independent jails concurrently within each priority group.
+Wait for the group to finish before starting the next priority.
+Named jails are deduplicated and ordered by priority.
+Stopped dependencies are included and must have an earlier or equal priority.
+Same-priority dependents wait for their prerequisites.
+.It Op Fl -jobs Ar N
+Limit simultaneous starts to a positive number.
+Requires
+.Fl -parallel .
+The default is the whole priority group.
 .El
+.Pp
+Parallel startup rejects missing dependencies, cycles, and priority conflicts
+before dispatch. A failed start completes the current group and blocks later
+groups. With
+.Fl -ignore ,
+eligible starts continue and the aggregate exception is suppressed.
+Completion of a group does not establish application readiness.
 .Pp
 Example:
 .Pp
@@ -1004,7 +1022,23 @@ Options:
 .It Op Fl -rc
 Stop all jails with boot=1 in a specific order.
 Jails with higher priority values stop first.
+.It Op Fl -parallel
+Stop jails concurrently within each priority group.
+Wait for the group to finish before stopping the next priority.
+Same-priority stops run together even when linked by depends.
+.It Op Fl -jobs Ar N
+Limit simultaneous stops to a positive number.
+Requires
+.Fl -parallel .
+The default is the whole priority group.
 .El
+.Pp
+Parallel stop attempts every priority group and reports failures at the end.
+Both parallel commands support ALL, --rc, and multiple jail names.
+Do not combine ALL or --rc with jail names.
+Use iocage_parallel="YES" in rc.conf to enable parallel boot and shutdown;
+iocage_parallel_jobs optionally sets the worker limit.
+iocage_program selects the executable, defaulting to /usr/local/bin/iocage.
 .Pp
 Example:
 .Pp

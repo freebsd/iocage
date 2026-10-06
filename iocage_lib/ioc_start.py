@@ -23,24 +23,25 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """This is responsible for starting jails."""
 import datetime
+import fcntl
 import hashlib
+import ipaddress
+import itertools
+import json
+import logging
 import os
 import re
-import fcntl
-import itertools
 import shutil
-import json
 import subprocess as su
+
 import netifaces
-import ipaddress
-import logging
 
 import iocage_lib.ioc_common
+import iocage_lib.ioc_exceptions as ioc_exceptions
 import iocage_lib.ioc_exec
 import iocage_lib.ioc_json
 import iocage_lib.ioc_list
 import iocage_lib.ioc_stop
-import iocage_lib.ioc_exceptions as ioc_exceptions
 
 
 class IOCStart(object):
@@ -53,7 +54,8 @@ class IOCStart(object):
 
     def __init__(
         self, uuid, path, silent=False, callback=None, is_depend=False,
-        unit_test=False, suppress_exception=False, used_ports=None
+        unit_test=False, suppress_exception=False, used_ports=None,
+        used_ips=None
     ):
         self.jail_uuid = uuid
         self.uuid = uuid.replace(".", "_")
@@ -68,6 +70,7 @@ class IOCStart(object):
         self.defaultrouter6 = 'auto'
         self.log = logging.getLogger('iocage')
         self.used_ports = used_ports or []
+        self.used_ips = used_ips
 
         if not self.unit_test:
             self.conf = iocage_lib.ioc_json.IOCJson(path).json_get_value('all')
@@ -384,7 +387,7 @@ class IOCStart(object):
                     f'Generating IP from nat_prefix: {self.conf["nat_prefix"]}'
                 )
                 ip4_addr, _ = iocage_lib.ioc_common.gen_nat_ip(
-                    self.conf['nat_prefix']
+                    self.conf['nat_prefix'], self.used_ips
                 )
                 self.ip4_addr = f'{nat_interface}|{ip4_addr}'
                 # Make this reality for list
@@ -398,7 +401,7 @@ class IOCStart(object):
                 )
                 self.defaultrouter, ip4_addr = \
                     iocage_lib.ioc_common.gen_nat_ip(
-                        self.conf['nat_prefix']
+                        self.conf['nat_prefix'], self.used_ips
                     )
                 self.ip4_addr = f'vnet0|{ip4_addr}/30'
                 # Make this reality for list
@@ -420,7 +423,9 @@ class IOCStart(object):
                 # Make sure this exists, jail(8) will tear it down if we don't
                 # manually do this.
                 if localhost_ip == 'none':
-                    localhost_ip = iocage_lib.ioc_common.gen_unused_lo_ip()
+                    localhost_ip = iocage_lib.ioc_common.gen_unused_lo_ip(
+                        self.used_ips
+                    )
                     self.set(f'localhost_ip={localhost_ip}')
 
                 with open(
@@ -651,24 +656,7 @@ class IOCStart(object):
         else:
             pre_start_env = None
 
-        prestart_success, prestart_error = iocage_lib.ioc_common.runscript(
-            exec_prestart, pre_start_env
-        )
-
-        if prestart_error:
-            iocage_lib.ioc_stop.IOCStop(
-                self.uuid, self.path, force=True, silent=True
-            )
-
-            iocage_lib.ioc_common.logit({
-                'level': 'EXCEPTION',
-                'message': '  + Executing exec_prestart FAILED\n'
-                           f'ERROR:\n{prestart_error}\n\nRefusing to '
-                           f'start {self.uuid}: exec_prestart failed'
-            },
-                _callback=self.callback,
-                silent=self.silent
-            )
+        self.__run_prestart__(exec_prestart, pre_start_env, devfs_ruleset)
 
         start = su.Popen(
             start_cmd, stderr=su.PIPE,
@@ -1777,18 +1765,43 @@ class IOCStart(object):
 
         return ipfw_conf
 
-    def __parse_nat_fwds__(self, forwards):
-        self.log.debug(f'Parsing NAT forwards: {forwards}')
+    def __run_prestart__(self, script, environment, devfs_ruleset):
+        """Release an unused ruleset when a prestart hook fails."""
+        _, error = iocage_lib.ioc_common.runscript(script, environment)
+
+        if error:
+            # IOCStop returns early for a jail that was never created, so
+            # release this start's ruleset before invoking normal cleanup.
+            with iocage_lib.ioc_common.devfs_ruleset_lock():
+                su.run(
+                    ['devfs', 'rule', '-s', devfs_ruleset, 'delset'],
+                    stdout=su.PIPE
+                )
+
+            iocage_lib.ioc_stop.IOCStop(
+                self.uuid, self.path, force=True, silent=True
+            )
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': '  + Executing exec_prestart FAILED\n'
+                           f'ERROR:\n{error}\n\nRefusing to '
+                           f'start {self.uuid}: exec_prestart failed'
+            }, _callback=self.callback, silent=self.silent)
+
+    @staticmethod
+    def __parse_nat_fwds__(forwards):
+        log = logging.getLogger('iocage')
+        log.debug(f'Parsing NAT forwards: {forwards}')
 
         for fwd in forwards.split(','):
             proto, port = fwd.split('(')
             port = port.strip('()')
 
-            self.log.debug(f'Proto: {proto} Port: {port}')
+            log.debug(f'Proto: {proto} Port: {port}')
             try:
                 port, map = port.rsplit(':', 1)
             except ValueError:
                 map = port
-            self.log.debug(f'Mapping {port} to {map}')
+            log.debug(f'Mapping {port} to {map}')
 
             yield proto, port, map

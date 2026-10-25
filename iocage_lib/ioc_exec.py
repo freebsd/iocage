@@ -250,6 +250,10 @@ class IOCExec(object):
                     timeout = 0
 
             if r:
+                # Yield only what this wakeup read; a stale chunk must not
+                # repeat.
+                rtrn_stdout = rtrn_stderr = b''
+
                 if self.proc.stdout.fileno() in r:
                     rtrn_stdout = self.proc.stdout.read()
 

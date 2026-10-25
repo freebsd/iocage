@@ -228,10 +228,20 @@ class IOCExec(object):
 
         timeout = 0.1
 
+        # poll(2), not select(2): select() rejects any descriptor numbered
+        # FD_SETSIZE (1024) or higher, and this loop also runs inside
+        # long-lived callers such as middlewared, where the pipe
+        # descriptors can be that high. poll() has no such limit.
+        poller = select.poll()
+        poller.register(
+            self.proc.stdout.fileno(), select.POLLIN | select.POLLHUP
+        )
+        poller.register(
+            self.proc.stderr.fileno(), select.POLLIN | select.POLLHUP
+        )
+
         while True:
-            r = select.select([
-                self.proc.stdout.fileno(),
-                self.proc.stderr.fileno()], [], [], timeout)[0]
+            r = [fd for fd, _ in poller.poll(int(timeout * 1000))]
 
             if self.proc.poll() is not None:
                 if timeout == 0:

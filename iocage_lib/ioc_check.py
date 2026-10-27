@@ -44,7 +44,6 @@ class IOCCheck(object):
     def __init__(
         self, silent=False, callback=None, migrate=False, reset_cache=False,
     ):
-        self.reset_cache = reset_cache
         if reset_cache:
             cache.reset()
         self.pool = iocage_lib.ioc_json.IOCJson(
@@ -56,9 +55,9 @@ class IOCCheck(object):
 
         self.__check_datasets__()
 
-        self.pool_root_dataset = Dataset(self.pool, cache=reset_cache)
+        self.pool_root_dataset = Dataset(self.pool)
         self.iocage_dataset = Dataset(
-            os.path.join(self.pool, 'iocage'), cache=reset_cache
+            os.path.join(self.pool, 'iocage')
         )
 
         if migrate:
@@ -90,7 +89,7 @@ class IOCCheck(object):
         for dataset in datasets:
             zfs_dataset_name = f"{self.pool}/{dataset}"
             try:
-                ds = Dataset(zfs_dataset_name, cache=self.reset_cache)
+                ds = Dataset(zfs_dataset_name)
 
                 if not ds.exists:
                     raise ZFSException(-1, 'Dataset does not exist')
@@ -120,7 +119,7 @@ class IOCCheck(object):
                 }
 
                 with DATASET_CREATION_LOCK:
-                    ds = Dataset(zfs_dataset_name, cache=self.reset_cache)
+                    ds = Dataset(zfs_dataset_name)
                     if not ds.exists:
                         ds.create({'properties': dataset_options})
 

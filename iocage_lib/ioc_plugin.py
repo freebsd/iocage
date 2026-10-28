@@ -33,28 +33,27 @@ import pathlib
 import re
 import shutil
 import subprocess as su
-import requests
 import tarfile
 import tempfile
 import threading
 import urllib.parse
 import uuid
 
+import texttable
+
 import iocage_lib.ioc_common
 import iocage_lib.ioc_create
 import iocage_lib.ioc_destroy
+import iocage_lib.ioc_exceptions
 import iocage_lib.ioc_exec
-import iocage_lib.ioc_list
 import iocage_lib.ioc_json
+import iocage_lib.ioc_list
 import iocage_lib.ioc_start
 import iocage_lib.ioc_stop
 import iocage_lib.ioc_upgrade
-import iocage_lib.ioc_exceptions
-import texttable
 
 from iocage_lib.cache import cache
 from iocage_lib.dataset import Dataset
-
 
 GIT_LOCK = threading.Lock()
 RE_PLUGIN_VERSION = re.compile(r'"path":"([/\.\+,\d\w-]*)\.txz"')
@@ -144,6 +143,9 @@ class IOCPlugin(object):
 
     @staticmethod
     def fetch_plugin_packagesites(package_sites):
+        # Defer requests to keep HTTP imports out of console startup.
+        import requests
+
         def download_parse_packagesite(packagesite_url):
             package_site_data = {}
 
@@ -421,6 +423,9 @@ class IOCPlugin(object):
                 ).get("license", False)
 
             if license and not accept_license:
+                # Defer requests to keep HTTP imports out of console startup.
+                import requests
+
                 license_text = requests.get(license)
 
                 iocage_lib.ioc_common.logit(

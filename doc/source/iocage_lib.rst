@@ -1,6 +1,38 @@
 iocage\_lib package
 ===================
 
+Console startup
+---------------
+
+Console validation uses ``IOCCheck(use_cache=True)`` to reuse dataset
+properties cached in the current process. Mountpoint and ``exec`` checks
+still run; missing datasets are checked again without caching inside the
+creation lock before provisioning. Other callers retain the default
+``use_cache=False`` behavior. ``reset_cache=True`` clears the cache before
+validation and also enables cached dataset access.
+
+``Dataset.get_dependents(use_cached_datasets=True)`` can reuse a complete
+recursive filesystem snapshot when it covers the requested dataset.
+Incomplete or out-of-scope snapshots fall back to the existing enumeration.
+The default remains ``use_cached_datasets=False``; ``ds_cache=False`` always
+queries ZFS. Existing dataset mutations invalidate the cached snapshot.
+Use ``IOCage.reset_cache()`` to clear cached metadata after external dataset
+changes in a long-lived process.
+
+``IOCExec`` and ``InteractiveExec`` accept two optional keyword-only arguments
+for reusing the context already resolved for a single execution:
+
+* ``jail_config``: the effective configuration from
+  ``IOCJson(path).json_get_value('all')``, including inherited defaults.
+* ``jail_status``: the ``(running, jid)`` tuple from
+  ``IOCList.list_get_jid(uuid)``.
+
+Passing ``None`` retains each argument's existing lookup behavior. Supply
+fresh values for the current execution; refresh both after starting a jail.
+Console does this when ``--force`` starts a stopped jail, then reuses the
+configuration for ``login_flags`` and ``exec_fib``. A failed launch after
+validation is reported without automatically restarting the jail.
+
 Submodules
 ----------
 

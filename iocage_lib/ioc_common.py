@@ -23,30 +23,28 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """Common methods we reuse."""
 import collections
+import concurrent.futures
 import contextlib
+import datetime as dt
+import glob
 import ipaddress
+import json
 import logging
 import os
+import re
+import shlex
 import shutil
 import stat
 import subprocess as su
 import tempfile as tmp
-
-import jsonschema
-import requests
-import datetime as dt
-import re
-import shlex
-import glob
-import netifaces
-import concurrent.futures
-import json
 import urllib.parse
+
+import netifaces
 
 import iocage_lib.ioc_exceptions
 import iocage_lib.ioc_exec
-from iocage_lib.cache import cache
 
+from iocage_lib.cache import cache
 from iocage_lib.dataset import Dataset
 
 INTERACTIVE = False
@@ -669,6 +667,9 @@ def parse_latest_release():
     """
     Returns the latest RELEASE from upstreams supported list
     """
+    # Defer requests to keep HTTP imports out of console startup.
+    import requests
+
     logging.getLogger("requests").setLevel(logging.WARNING)
     sup = "https://www.freebsd.org/security/index.html#sup"
     req = requests.get(sup)
@@ -1135,6 +1136,9 @@ def get_active_jails():
 
 
 def validate_plugin_manifest(manifest, _callback, silent):
+    # Defer jsonschema; console startup does not validate plugin manifests.
+    import jsonschema
+
     v = jsonschema.Draft7Validator(cache.plugin_manifest_schema)
 
     errors = []

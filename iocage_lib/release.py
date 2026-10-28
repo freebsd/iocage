@@ -1,13 +1,11 @@
 import os
 import re
-import requests
 
 import iocage_lib.dataset as dataset
 
 from iocage_lib.cache import cache
-from iocage_lib.resource import IocageListableResource
-from iocage_lib.ioc_fetch import IOCFetch
 from iocage_lib.ioc_common import check_release_newer
+from iocage_lib.resource import IocageListableResource
 
 
 class Release(dataset.Dataset):
@@ -42,12 +40,17 @@ class ListableReleases(IocageListableResource):
         self.eol_check = eol_check
         self.eol_list = []
         if eol_check and remote:
+            from iocage_lib.ioc_fetch import IOCFetch
+
             # TODO: Please let's not use this in the future and look at
             # comments above
             self.eol_list = IOCFetch.__fetch_eol_check__()
 
     def __iter__(self):
         if self.remote:
+            # Defer requests to keep HTTP imports out of console startup.
+            import requests
+
             # TODO: Please abstract this in the future
             req = requests.get(
                 'https://download.freebsd.org/ftp/'

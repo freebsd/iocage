@@ -32,26 +32,21 @@ import subprocess as su
 import iocage_lib.ioc_clean as ioc_clean
 import iocage_lib.ioc_common as ioc_common
 import iocage_lib.ioc_create as ioc_create
+import iocage_lib.ioc_debug as ioc_debug
 import iocage_lib.ioc_destroy as ioc_destroy
+import iocage_lib.ioc_exceptions as ioc_exceptions
 import iocage_lib.ioc_exec as ioc_exec
-import iocage_lib.ioc_fetch as ioc_fetch
 import iocage_lib.ioc_fstab as ioc_fstab
-import iocage_lib.ioc_image as ioc_image
 import iocage_lib.ioc_json as ioc_json
 import iocage_lib.ioc_list as ioc_list
-import iocage_lib.ioc_plugin as ioc_plugin
 import iocage_lib.ioc_start as ioc_start
 import iocage_lib.ioc_stop as ioc_stop
-import iocage_lib.ioc_upgrade as ioc_upgrade
-import iocage_lib.ioc_debug as ioc_debug
-import iocage_lib.ioc_exceptions as ioc_exceptions
 
 from iocage_lib.cache import cache
 from iocage_lib.dataset import Dataset
 from iocage_lib.pools import Pool, PoolListableResource
 from iocage_lib.release import Release
-from iocage_lib.snapshot import SnapshotListableResource, Snapshot
-
+from iocage_lib.snapshot import Snapshot, SnapshotListableResource
 
 # Workaround for click bugs and incompatible changes introduced
 # in 8.2.x. Once we can upgrade to click 8.4.1, this and all
@@ -252,7 +247,7 @@ class IOCage:
                         _callback=self.callback, silent=self.silent
                     )
 
-    def __check_jail_existence__(self):
+    def __check_jail_existence__(self, *, quick=False):
         """
         Helper to check if jail dataset exists
         Return:
@@ -281,9 +276,12 @@ class IOCage:
             return self.jail, path
         else:
             if self.skip_jails:
-                # We skip jails for performance, but if they didn't match be
-                #  now need to gather the list and iterate.
-                self.jails = self.list("uuid")
+                # Exact names skip enumeration. Console prefixes can reuse
+                # the complete dataset snapshot loaded during validation.
+                if quick:
+                    self.jails = self.list("uuid", quick=True)
+                else:
+                    self.jails = self.list("uuid")
 
             # We got a partial, time to search.
             _jail = {
@@ -569,6 +567,8 @@ class IOCage:
                 # Non-standard naming scheme, assuming it's current
                 pass
 
+            import iocage_lib.ioc_fetch as ioc_fetch
+
             ioc_fetch.IOCFetch(
                 release,
                 hardened=hardened,
@@ -835,6 +835,11 @@ class IOCage:
                 _callback=self.callback,
                 silent=self.silent)
 
+        if console:
+            uuid, path = self.__check_jail_existence__(quick=True)
+            self._console(uuid, path, start_jail)
+            return
+
         uuid, path = self.__check_jail_existence__()
         exec_clean = self.get('exec_clean')
 
@@ -900,25 +905,6 @@ class IOCage:
 
             command = ["pkg", "-j", jid] + list(command)
 
-        if console:
-            login_flags = self.get('login_flags').split()
-            console_cmd = ['login', '-p'] + login_flags
-
-            try:
-                ioc_exec.InteractiveExec(console_cmd, path, uuid=uuid)
-            except BaseException as e:
-                ioc_common.logit(
-                    {
-                        'level': 'ERROR',
-                        'message': 'Console failed!\nThe cause could be bad '
-                                   f'permissions for {path}/root/usr/lib.'
-                    },
-                    _callback=self.callback,
-                    silent=False
-                )
-                raise e
-            return
-
         if interactive or pkg:
             ioc_exec.InteractiveExec(
                 command,
@@ -977,8 +963,51 @@ class IOCage:
                     _callback=self.callback,
                     silent=self.silent)
 
+    def _console(self, uuid, path, start_jail):
+        """Prepare a login once and pass its context to the executor."""
+        conf = ioc_json.IOCJson(path).json_get_value('all')
+        status, jid = ioc_list.IOCList.list_get_jid(uuid)
+
+        if not status and start_jail:
+            self.start()
+            status, jid = ioc_list.IOCList.list_get_jid(uuid)
+            conf = ioc_json.IOCJson(path).json_get_value('all')
+
+        if not status:
+            force = '--force (-f)' if ioc_common.INTERACTIVE else \
+                'start_jail=True'
+            ioc_common.logit(
+                {
+                    'level': 'EXCEPTION',
+                    'message': f'{self.jail} is not running! Please supply'
+                               f' {force} or start the jail'
+                },
+                _callback=self.callback,
+                silent=self.silent)
+            return
+
+        console_cmd = ['login', '-p'] + conf['login_flags'].split()
+        try:
+            ioc_exec.InteractiveExec(
+                console_cmd, path, uuid=uuid,
+                jail_config=conf, jail_status=(status, jid)
+            )
+        except BaseException:
+            ioc_common.logit(
+                {
+                    'level': 'ERROR',
+                    'message': 'Console failed!\nThe cause could be bad '
+                               f'permissions for {path}/root/usr/lib.'
+                },
+                _callback=self.callback,
+                silent=False
+            )
+            raise
+
     def export(self, compression_algo='zip'):
         """Will export a jail"""
+        import iocage_lib.ioc_image as ioc_image
+
         uuid, path = self.__check_jail_existence__()
         status, _ = self.list("jid", uuid=uuid)
 
@@ -1046,6 +1075,8 @@ class IOCage:
                 kwargs["hardened"] = False
 
         if plugins or plugin_name:
+            import iocage_lib.ioc_plugin as ioc_plugin
+
             if _list:
                 rel_list = ioc_plugin.IOCPlugin(
                     branch=branch,
@@ -1115,6 +1146,7 @@ class IOCage:
         else:
             kwargs.pop('git_repository', None)
             kwargs.pop('git_destination', None)
+            import iocage_lib.ioc_fetch as ioc_fetch
 
             if _list:
                 if remote:
@@ -1358,6 +1390,8 @@ class IOCage:
 
     def import_(self, compression_algo='zip', path=None):
         """Imports a jail"""
+        import iocage_lib.ioc_image as ioc_image
+
         ioc_image.IOCImage().import_jail(
             self.jail, compression_algo=compression_algo, path=path
         )
@@ -1998,6 +2032,8 @@ class IOCage:
                 })
 
             if jail_type == "pluginv2" or jail_type == "plugin":
+                import iocage_lib.ioc_plugin as ioc_plugin
+
                 # TODO: Warn about erasing all pkgs
                 ioc_common.logit({
                     'level': 'INFO',
@@ -2023,6 +2059,8 @@ class IOCage:
             is_basejail = ioc_common.check_truthy(conf['basejail'])
             params = [] if is_basejail else [True, uuid]
             try:
+                import iocage_lib.ioc_fetch as ioc_fetch
+
                 ioc_fetch.IOCFetch(
                     release,
                     server,
@@ -2108,6 +2146,8 @@ class IOCage:
                 _callback=self.callback)
 
         if conf["type"] == "jail":
+            import iocage_lib.ioc_upgrade as ioc_upgrade
+
             if not status:
                 ioc_start.IOCStart(uuid, path, silent=True)
                 started = True
@@ -2146,6 +2186,8 @@ class IOCage:
                 },
                 _callback=self.callback)
         elif conf["type"] == "pluginv2":
+            import iocage_lib.ioc_plugin as ioc_plugin
+
             if not status:
                 ioc_start.IOCStart(uuid, path, silent=True)
                 started = True

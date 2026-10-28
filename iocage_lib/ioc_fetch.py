@@ -33,10 +33,6 @@ import tempfile
 import time
 import urllib.request
 
-import requests
-import requests.auth
-import requests.packages.urllib3.exceptions
-
 import iocage_lib.ioc_common
 import iocage_lib.ioc_destroy
 import iocage_lib.ioc_exceptions
@@ -44,9 +40,9 @@ import iocage_lib.ioc_exec
 import iocage_lib.ioc_json
 import iocage_lib.ioc_start
 
-
-from iocage_lib.pools import Pool
 from iocage_lib.dataset import Dataset
+from iocage_lib.pools import Pool
+
 
 # taken from tarfile.tar_filter (and _get_filtered_attrs)
 # basically the same, but **without**:
@@ -71,6 +67,7 @@ def untar_release_filter(member, dest_path):
     if new_attrs:
         return member.replace(**new_attrs, deep=False)
     return member
+
 
 class IOCFetch:
 
@@ -126,6 +123,9 @@ class IOCFetch:
                 self.release = release
 
         if not verify:
+            # Defer requests to keep HTTP imports out of console startup.
+            import requests.packages.urllib3.exceptions
+
             # The user likely knows this already.
             requests.packages.urllib3.disable_warnings(
                 requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -133,6 +133,9 @@ class IOCFetch:
     @staticmethod
     def __fetch_eol_check__():
         """Scrapes the FreeBSD website and returns a list of EOL RELEASES"""
+        # Defer requests to keep HTTP imports out of console startup.
+        import requests
+
         logging.getLogger("requests").setLevel(logging.WARNING)
         _eol = "https://www.freebsd.org/security/unsupported.html"
         req = requests.get(_eol)
@@ -323,6 +326,9 @@ class IOCFetch:
             - XX.X-RELEASE
             - XX.X-RELEASE
         """
+        # Defer requests to keep HTTP imports out of console startup.
+        import requests
+        import requests.auth
 
         if self.hardened:
             if self.server == "download.freebsd.org":
@@ -503,6 +509,10 @@ class IOCFetch:
         """
         Checks if the RELEASE exists on the remote
         """
+        # Defer requests to keep HTTP imports out of console startup.
+        import requests
+        import requests.auth
+
         release = f"{self.server}/{self.root_dir}/{self.release}"
 
         if self.auth == "basic":
@@ -676,6 +686,10 @@ class IOCFetch:
 
     def fetch_download(self, _list, missing=False):
         """Creates the download dataset and then downloads the RELEASE."""
+        # Defer requests to keep HTTP imports out of console startup.
+        import requests
+        import requests.auth
+
         dataset = f"{self.iocroot}/download/{self.release}"
         fresh = False
 

@@ -1,17 +1,27 @@
-from iocage_lib.cache import cache
-from iocage_lib.resource import Resource, ListableResource
-from iocage_lib.zfs import (
-    ZFSException, create_dataset, get_dependents, destroy_zfs_resource,
-    umount_dataset, mount_dataset, get_dataset_from_mountpoint,
-    rename_dataset, dataset_exists, promote_dataset, list_snapshots,
-    iocage_activated_dataset, rollback_snapshot, create_snapshot,
-    clone_snapshot,
-)
-
 import contextlib
 import os
 
 from copy import deepcopy
+
+from iocage_lib.cache import cache
+from iocage_lib.resource import ListableResource, Resource
+from iocage_lib.zfs import (
+    ZFSException,
+    clone_snapshot,
+    create_dataset,
+    create_snapshot,
+    dataset_exists,
+    destroy_zfs_resource,
+    get_dataset_from_mountpoint,
+    get_dependents,
+    iocage_activated_dataset,
+    list_snapshots,
+    mount_dataset,
+    promote_dataset,
+    rename_dataset,
+    rollback_snapshot,
+    umount_dataset,
+)
 
 
 class Dataset(Resource):
@@ -78,9 +88,17 @@ class Dataset(Resource):
     def mounted(self):
         return self.properties['mounted'] == 'yes'
 
-    def get_dependents(self, depth=1, ds_cache=True):
-        gd = cache.dependents if ds_cache else get_dependents
-        for d in gd(self.resource_name, depth):
+    def get_dependents(
+        self, depth=1, ds_cache=True, *, use_cached_datasets=False,
+    ):
+        if ds_cache and use_cached_datasets:
+            names = cache.dependents(
+                self.resource_name, depth, use_cached_datasets=True)
+        else:
+            gd = cache.dependents if ds_cache else get_dependents
+            names = gd(self.resource_name, depth)
+
+        for d in names:
             ds = Dataset(d, cache=ds_cache)
             if ds.locked:
                 continue

@@ -22,18 +22,18 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """iocage exec module."""
-import subprocess as su
-
-import iocage_lib.ioc_common
-import iocage_lib.ioc_json
-import iocage_lib.ioc_list
-import iocage_lib.ioc_start
-import iocage_lib.ioc_exceptions
-import select
+import collections
 import fcntl
 import os
 import re
-import collections
+import select
+import subprocess as su
+
+import iocage_lib.ioc_common
+import iocage_lib.ioc_exceptions
+import iocage_lib.ioc_json
+import iocage_lib.ioc_list
+import iocage_lib.ioc_start
 
 
 class IOCExec(object):
@@ -54,8 +54,18 @@ class IOCExec(object):
         su_env=None,
         keep_proxy=False,
         decode=False,
-        callback=None
+        callback=None,
+        *,
+        jail_config=None,
+        jail_status=None
     ):
+        """Prepare an execution, optionally reusing freshly resolved jail data.
+
+        jail_config is the effective configuration returned by IOCJson's
+        json_get_value('all'), including inherited defaults. jail_status is
+        the (running, jid) tuple returned by IOCList.list_get_jid(). Supply
+        snapshots for this execution only; None resolves each value normally.
+        """
         self.command = command
         self.uuid = uuid.replace(".", "_") if uuid is not None else uuid
         self.path = path
@@ -95,10 +105,20 @@ class IOCExec(object):
         self.cmd = self.command
 
         if self.uuid is not None and self.uuid:
-            self.status, _ = iocage_lib.ioc_list.IOCList().list_get_jid(
-                self.uuid)
-            self.conf = iocage_lib.ioc_json.IOCJson(self.path).json_get_value(
-                'all')
+            # Optional snapshots apply only to this execution; other callers
+            # still resolve their own configuration and running state.
+            if jail_status is None:
+                self.status, _ = iocage_lib.ioc_list.IOCList().list_get_jid(
+                    self.uuid)
+            else:
+                self.status, _ = jail_status
+
+            if jail_config is None:
+                self.conf = iocage_lib.ioc_json.IOCJson(
+                    self.path).json_get_value('all')
+            else:
+                self.conf = jail_config.copy()
+
             exec_fib = self.conf["exec_fib"]
 
             self.flight_checks()

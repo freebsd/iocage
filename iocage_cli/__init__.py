@@ -23,6 +23,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """The main CLI for ioc."""
 
+import importlib.metadata
 import locale
 import logging
 import logging.config
@@ -34,13 +35,13 @@ import subprocess as su
 import sys
 
 import click
-import coloredlogs
-import iocage_lib.ioc_check as ioc_check
+
 # This prevents it from getting in our way.
 from click import core
-from iocage_lib.ioc_common import set_interactive
 
-import importlib.metadata
+import iocage_lib.ioc_check as ioc_check
+
+from iocage_lib.ioc_common import set_interactive
 
 try:
     __version__ = importlib.metadata.version('iocage')
@@ -81,7 +82,19 @@ def print_version(ctx, param, value):
 
 class InfoHandler(logging.Handler):
 
+    def __init__(self, level=logging.NOTSET, *, level_styles=None):
+        super().__init__(level)
+        self.level_styles = level_styles
+
     def emit(self, record):
+        if self.formatter is None:
+            # Quiet commands such as console do not need coloredlogs.
+            # Handler.handle() holds the handler lock during initialization.
+            import coloredlogs
+
+            self.setFormatter(coloredlogs.ColoredFormatter(
+                fmt="%(message)s", level_styles=self.level_styles))
+
         log = self.format(record)
 
         if record.levelno < 30:
@@ -154,10 +167,7 @@ class IOCLogger(object):
         if os.geteuid() == 0:
             logging.config.dictConfig(default_logging)
 
-        handler = InfoHandler()
-        handler.setFormatter(coloredlogs.ColoredFormatter(
-            fmt="%(message)s",
-            level_styles=cli_colors))
+        handler = InfoHandler(level_styles=cli_colors)
         logger.addHandler(handler)
 
     def setConsoleLogLevel(self, level):
@@ -224,7 +234,8 @@ class IOCageCLI(click.MultiCommand):
     "-D",
     is_flag=True,
     help="Log debug output to the console.")
-def cli(version, force, debug):
+@click.pass_context
+def cli(ctx, version, force, debug):
     """A jail manager."""
     os.environ['IOCAGE_DEBUG'] = 'FALSE'
     logger = IOCLogger()
@@ -263,7 +274,7 @@ def cli(version, force, debug):
                 ioc_check.IOCCheck(silent=True)
 
         if not skip_check:
-            ioc_check.IOCCheck()
+            ioc_check.IOCCheck(use_cache=ctx.invoked_subcommand == 'console')
     except RuntimeError as err:
         exit(err)
 

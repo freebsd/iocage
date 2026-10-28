@@ -4,7 +4,10 @@ import subprocess as su
 import threading
 
 from iocage_lib.zfs import (
-    all_properties, dataset_exists, get_all_dependents, get_dependents_with_depth,
+    all_properties,
+    dataset_exists,
+    get_all_dependents,
+    get_dependents_with_depth,
 )
 
 
@@ -14,8 +17,9 @@ class Cache:
 
     def __init__(self):
         self.fields = [
-            'dataset_data', 'pool_data', 'dataset_dep_data', 'ioc_pool', 'ioc_dataset',
-            '_freebsd_version', '_plugin_manifest_schema'
+            'dataset_data', 'pool_data', 'dataset_dep_data', 'ioc_pool',
+            'ioc_dataset', '_freebsd_version', '_plugin_manifest_schema',
+            'dataset_tree_root'
         ]
         self.reset()
 
@@ -71,18 +75,41 @@ class Cache:
                 ds = ''
                 if ioc_pool:
                     ds = os.path.join(ioc_pool, 'iocage')
+                paths = [ds] if ds and dataset_exists(ds) else []
                 self.dataset_data.update(all_properties(
-                    [ds] if ds and dataset_exists(ds) else [], recursive=True, types=['filesystem']
+                    paths, recursive=True, types=['filesystem']
                 ))
+                # None means incomplete; '' covers all filesystem datasets.
+                # Set the scope only after the recursive query succeeds.
+                self.dataset_tree_root = paths[0] if paths else ''
             return self.dataset_data
 
-    def dependents(self, dataset, depth=None):
+    def dependents(self, dataset, depth=None, *, use_cached_datasets=False):
+        if use_cached_datasets:
+            return self.dependents_internal(
+                dataset, depth, use_cached_datasets=True)
+
         return self.dependents_internal(dataset, depth)
 
-    def dependents_internal(self, dataset, depth=None, lock=True):
+    def dependents_internal(
+        self, dataset, depth=None, lock=True, *, use_cached_datasets=False,
+    ):
         if lock:
             self.cache_lock.acquire()
         try:
+            root = self.dataset_tree_root
+            if use_cached_datasets and root is not None and (
+                not root or dataset == root or dataset.startswith(root + '/')
+            ):
+                # Reuse only a complete recursive filesystem snapshot.
+                names = sorted(
+                    name for name, props in self.dataset_data.items()
+                    if props.get('type') == 'filesystem' and (
+                        name == dataset or name.startswith(dataset + '/')
+                    )
+                )
+                return get_dependents_with_depth(dataset, names, depth)
+
             if not self.dataset_dep_data:
                 self.dataset_dep_data = {}
                 for ds in get_all_dependents():

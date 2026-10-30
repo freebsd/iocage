@@ -17,22 +17,26 @@ FAQ
 **What is VNET?**
     VNET is an independent, per jail virtual networking stack.
 
-**How do I configure network interfaces in a VNET or shared IPjail?**
+**How do I configure network interfaces in a VNET or shared IP jail?**
     Both are configured in the same way:
-    :command:`iocage set ip4_add="[interface]|[IP]/[netmask]" [UUID | NAME]`.
+    :command:`iocage set ip4_addr="[interface]|[IP]/[netmask]" [UUID | NAME]`.
     For more info, please refer to the :ref:`Networking` section of this
     documentation.
 
 **Do I need to set my default gateway?**
-    Only if VNET is enabled. You need to assign an IP address to the
-    **bridge** where the jail interface is attached. This IP essentially
-    becomes the default gateway for your jail.
+    VNET jails have their own routing tables. ``defaultrouter`` and
+    ``defaultrouter6`` default to ``auto``, which uses the host's default
+    gateways. Set a different gateway when the jail's network requires it.
+    Shared IP jails use the host's routing table.
 
 **Can I run a firewall inside a jail?**
-    Yes, a VNET jail supports **IPFW**. *PF* is not supported inside the
-    jail. However, you can still enable *PF* for the host. If you plan
-    to use **IPFW** inside a jail, be sure **securelevel** is set to
-    **2**.
+    Yes, VNET jails support **IPFW** and **PF**. Load the corresponding
+    firewall module on the host. For PF, use a devfs ruleset that exposes
+    ``/dev/pf``, such as ``devfs_ruleset=5``. Keep ``securelevel`` at **2**
+    or lower if firewall rules must be changed inside the jail. See the
+    `FreeBSD Handbook's VNET jail instructions
+    <https://docs.freebsd.org/en/books/handbook/jails/#jails-vnet>`_
+    for details.
 
 **Can I enable both IPFW and PF at the same time?**
     Yes, make sure you allow traffic on both in/out for your jails.
@@ -45,17 +49,21 @@ FAQ
     source jail.
 
 **Can I limit the CPU and Memory use?**
-    Yes, but **only** for legacy versions of :command:`iocage`. Refer to
-    the :file:`iocage.8` manual page or :ref:`Resource Limits` section
-    of this documentation for more details.
+    Yes. ``cpuset`` controls CPU affinity without resource accounting.
+    Resource limit properties such as ``memoryuse`` and ``pcpu`` require
+    FreeBSD resource accounting to be enabled.
+    Refer to the :ref:`Resource Limits` section for examples.
 
 **Is there a way to display resource consumption?**
-    Yes - :command:`iocage df`
+    :command:`iocage df` shows ZFS storage usage. With resource accounting
+    enabled, :command:`rctl -hu jail:ioc-examplejail` shows a running jail's
+    CPU, memory, and other resource usage from the host. Use the actual jail
+    name reported by :command:`jls -n name`.
 
 **Is NAT supported for jails?**
     Yes. NAT is built into FreeBSD. Treat your server as a core
     router/firewall. Check the FreeBSD
-    `Firewalls chapter <https://www.freebsd.org/doc/handbook/firewalls.html>`_
+    `Firewalls chapter <https://docs.freebsd.org/en/books/handbook/firewalls/>`_
     for more details.
 
 **Will iocage work on a generic system with no ZFS pools?**

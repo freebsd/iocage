@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,6 +24,126 @@
 from unittest import mock
 import pytest
 import iocage_lib.ioc_start as ioc_start
+
+
+@pytest.mark.parametrize('prefix', [
+    '',
+    'epair0b: flags=8843<UP,BROADCAST,RUNNING> metric 0 mtu 1500\n',
+    'epair0b: flags=8843<UP,BROADCAST,RUNNING> metric 0 mtu 1500\n'
+    '\tdescription: DHCP interface\n\tether 00:00:00:00:00:01\n'
+    '\tinet6 fe80::1%epair0b prefixlen 64 scopeid 0x1\n',
+])
+@pytest.mark.parametrize('lease, expected_address', [
+    ('192.0.2.10/24', '192.0.2.10'),
+    ('10.0.0.0/31', '10.0.0.0'),
+])
+@mock.patch('iocage_lib.ioc_common.logit')
+@mock.patch('iocage_lib.ioc_stop.IOCStop')
+@mock.patch('iocage_lib.ioc_start.su.check_output')
+def test_dhcp_cidr_ignores_output_position(
+    check_output, stop, logit, prefix, lease, expected_address
+):
+    check_output.return_value = (
+        prefix + f'\tinet {lease}\n'
+        '\tinet 192.0.2.11/24 broadcast 192.0.2.255\n'
+    ).encode()
+    start = ioc_start.IOCStart('test', '/jails/test', unit_test=True)
+    start.conf = {'interfaces': 'vnet0:bridge0,vnet1:bridge1'}
+
+    start._check_dhcp_address()
+
+    check_output.assert_called_once_with([
+        'jexec', 'ioc-test', 'ifconfig', '-f', 'inet:cidr', 'epair0b', 'inet'
+    ])
+    assert start.ip4_addr == expected_address
+    stop.assert_not_called()
+    assert logit.call_args.args[0]['message'].endswith(lease)
+
+
+@pytest.mark.parametrize('output', [
+    b'\tinet 0.0.0.0/24\n',
+    b'epair0b: flags=8843<UP>\n\tether 00:00:00:00:00:01\n',
+    b'\tinet invalid/24\n',
+    b'\tinet\n',
+    ioc_start.su.CalledProcessError(1, 'ifconfig'),
+])
+@mock.patch('iocage_lib.ioc_common.logit', side_effect=RuntimeError)
+@mock.patch('iocage_lib.ioc_stop.IOCStop')
+@mock.patch('iocage_lib.ioc_start.su.check_output')
+def test_dhcp_failure_stops_jail(check_output, stop, logit, output):
+    if isinstance(output, Exception):
+        check_output.side_effect = output
+    else:
+        check_output.return_value = output
+    start = ioc_start.IOCStart('test', '/jails/test', unit_test=True)
+    start.conf = {'interfaces': 'epair1b:bridge0'}
+
+    with pytest.raises(RuntimeError):
+        start._check_dhcp_address()
+
+    stop.assert_called_once_with(
+        'test', '/jails/test', force=True, silent=True
+    )
+    assert logit.call_args.args[0]['level'] == 'EXCEPTION'
+    assert 'Stopped test due to DHCP failure' in (
+        logit.call_args.args[0]['message']
+    )
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_startup_preserves_current_jail_parameters(tmp_path, enabled):
+    start = ioc_start.IOCStart('test', str(tmp_path), unit_test=True)
+    start.pool = 'pool'
+    start.iocroot = str(tmp_path)
+    start.exec_fib = '0'
+    start.set = mock.Mock()
+    with mock.patch.object(
+        ioc_start.iocage_lib.ioc_json.IOCConfiguration,
+        'get_mac_prefix', return_value='02ff60'
+    ):
+        start.conf = (
+            ioc_start.iocage_lib.ioc_json.IOCConfiguration
+            .retrieve_default_props()
+        )
+    start.conf['host_hostname'] = 'test'
+    permissions = (
+        'allow_mount_tmpfs', 'allow_mount_fdescfs', 'allow_mlock',
+        'allow_mount_fusefs', 'allow_vmm', 'allow_nfsd'
+    )
+    for prop in permissions:
+        start.conf[prop] = int(enabled)
+    start.conf['exec_created'] = '/usr/bin/true'
+    start.get = start.conf.__getitem__
+    (tmp_path / 'jails' / 'test').mkdir(parents=True)
+    (tmp_path / 'jails' / 'test' / 'fstab').touch()
+
+    class ConfigurationReady(Exception):
+        pass
+
+    with (
+        mock.patch('iocage_lib.ioc_list.IOCList') as jail_list,
+        mock.patch('iocage_lib.ioc_common.get_host_gateways'),
+        mock.patch('iocage_lib.ioc_fstab.IOCFstab') as fstab,
+        mock.patch.object(start, '__check_dhcp_or_accept_rtadv__'),
+        mock.patch('iocage_lib.ioc_common.logit'),
+        mock.patch('iocage_lib.ioc_common.generate_devfs_ruleset',
+                   return_value=(False, '4', '1000')),
+        mock.patch('iocage_lib.ioc_json.JailRuntimeConfiguration') as runtime,
+    ):
+        jail_list.return_value.list_get_jid.return_value = (False, None)
+        fstab.return_value.__validate_fstab__ = mock.Mock()
+        runtime.return_value.sync_changes.side_effect = ConfigurationReady
+        with pytest.raises(ConfigurationReady):
+            start.__start_jail__()
+
+    parameters = runtime.call_args.args[1]
+    assert 'mount.fdescfs=1' in parameters
+    assert 'exec.created=/usr/bin/true' in parameters
+    for prop in ('sysvmsg', 'sysvsem', 'sysvshm'):
+        assert f'{prop}=new' in parameters
+    for prop in permissions:
+        parameter = prop.replace('_', '.') + '=1'
+        assert (parameter in parameters) == enabled
 
 
 @mock.patch('iocage_lib.ioc_common.checkoutput')
@@ -278,7 +398,9 @@ def test_vnet_addr_dhcp_in_ip4_addr_string_skips_ipv4(mock_checkoutput):
 
 
 @mock.patch('iocage_lib.ioc_common.checkoutput')
-def test_vnet_addr_dhcp_in_ip4_addr_string_still_applies_ipv6(mock_checkoutput):
+def test_vnet_addr_dhcp_in_ip4_addr_string_still_applies_ipv6(
+    mock_checkoutput
+):
     """ip4_addr containing DHCP must not prevent IPv6 assignment."""
     iocstart = _make_iocstart_for_addr(dhcp=0, ip4_addr='vnet0|DHCP')
     iocstart.start_network_vnet_addr(

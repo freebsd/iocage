@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -98,7 +98,6 @@ class IOCStart(object):
         will be copied into the jail.
         """
         status, _ = iocage_lib.ioc_list.IOCList().list_get_jid(self.uuid)
-        userland_version = float(os.uname()[2].partition("-")[0])
 
         # If the jail is not running, let's do this thing.
 
@@ -333,46 +332,17 @@ class IOCStart(object):
                     raise RuntimeError(
                         f"{err.output.decode('utf-8').rstrip()}")
 
-        # FreeBSD 9.3 and under do not support this.
-
-        if userland_version <= 9.3:
-            tmpfs = ""
-            fdescfs = ""
-            _allow_mount_fdescfs = ""
-        else:
-            tmpfs = f"allow.mount.tmpfs={allow_mount_tmpfs}"
-            fdescfs = f"mount.fdescfs={mount_fdescfs}"
-            _allow_mount_fdescfs = f"allow.mount.fdescfs={allow_mount_fdescfs}"
-
-        # FreeBSD 10.3 and under do not support this.
-
-        if userland_version <= 10.3:
-            _sysvmsg = ""
-            _sysvsem = ""
-            _sysvshm = ""
-        else:
-            _sysvmsg = f"sysvmsg={sysvmsg}"
-            _sysvsem = f"sysvsem={sysvsem}"
-            _sysvshm = f"sysvshm={sysvshm}"
-
-        # FreeBSD before 12.0 does not support this.
-
-        if userland_version < 12.0:
-            _allow_mlock = ''
-            _allow_mount_fusefs = ''
-            _allow_vmm = ''
-            _exec_created = ''
-        else:
-            _allow_mlock = f"allow.mlock={allow_mlock}"
-            _allow_mount_fusefs = f"allow.mount.fusefs={allow_mount_fusefs}"
-            _allow_vmm = f"allow.vmm={allow_vmm}"
-            _exec_created = f'exec.created={exec_created}'
-
-        # FreeBSD < 13.3 does not support nfsd in jail
-        if userland_version < 13.3:
-            _allow_nfsd = ''
-        else:
-            _allow_nfsd = f"allow.nfsd={allow_nfsd}"
+        tmpfs = f"allow.mount.tmpfs={allow_mount_tmpfs}"
+        fdescfs = f"mount.fdescfs={mount_fdescfs}"
+        _allow_mount_fdescfs = f"allow.mount.fdescfs={allow_mount_fdescfs}"
+        _sysvmsg = f"sysvmsg={sysvmsg}"
+        _sysvsem = f"sysvsem={sysvsem}"
+        _sysvshm = f"sysvshm={sysvshm}"
+        _allow_mlock = f"allow.mlock={allow_mlock}"
+        _allow_mount_fusefs = f"allow.mount.fusefs={allow_mount_fusefs}"
+        _allow_vmm = f"allow.vmm={allow_vmm}"
+        _exec_created = f'exec.created={exec_created}'
+        _allow_nfsd = f"allow.nfsd={allow_nfsd}"
 
         if nat:
             self.log.debug(f'Checking NAT backend: {nat_backend}')
@@ -907,61 +877,11 @@ class IOCStart(object):
             )
 
         if not vnet_err and vnet and wants_dhcp:
-            failed_dhcp = False
-
-            try:
-                interface = self.conf['interfaces'].split(',')[0].split(
-                    ':')[0]
-
-                if 'vnet' in interface:
-                    # Jails default is epairNb
-                    interface = f'{interface.replace("vnet", "epair")}b'
-
-                # We'd like to use ifconfig -f inet:cidr here,
-                # but only FreeBSD 11.0 and newer support it...
-                cmd = ['jexec', f'ioc-{self.uuid}', 'ifconfig',
-                       interface, 'inet']
-                out = su.check_output(cmd)
-
-                # ...so we extract the ip4 address and mask,
-                # and calculate cidr manually
-                addr_split = out.splitlines()[2].split()
-                self.ip4_addr = addr_split[1].decode()
-                hexmask = addr_split[3].decode()
-                maskcidr = sum([bin(int(hexmask, 16)).count('1')])
-
-                addr = f'{self.ip4_addr}/{maskcidr}'
-
-                if '0.0.0.0' in addr:
-                    failed_dhcp = True
-
-            except (su.CalledProcessError, IndexError):
-                failed_dhcp = True
-                addr = 'ERROR, check jail logs'
-
-            if failed_dhcp:
-                iocage_lib.ioc_stop.IOCStop(
-                    self.uuid, self.path, force=True, silent=True
-                )
-
-                iocage_lib.ioc_common.logit({
-                    'level': 'EXCEPTION',
-                    'message': '  + Acquiring DHCP address: FAILED,'
-                    f' address received: {addr}\n'
-                    f'\nStopped {self.uuid} due to DHCP failure'
-                },
-                    _callback=self.callback)
-
-            iocage_lib.ioc_common.logit({
-                'level': 'INFO',
-                'message': f'  + DHCP Address: {addr}'
-            },
-                _callback=self.callback,
-                silent=self.silent)
+            self._check_dhcp_address()
 
         self.set(
             "last_started={}".format(
-                datetime.datetime.utcnow().strftime("%F %T")
+                datetime.datetime.now(datetime.UTC).strftime("%F %T")
             )
         )
 
@@ -1014,6 +934,58 @@ class IOCStart(object):
                     'level': 'ERROR',
                     'message': f'  + Failed to set cpuset to: {cpuset}'
                 })
+
+    def _check_dhcp_address(self):
+        """Read the first IPv4 lease and stop the jail if DHCP failed."""
+        failed_dhcp = False
+
+        try:
+            interface = self.conf['interfaces'].split(',')[0].split(
+                ':')[0]
+
+            if 'vnet' in interface:
+                # Jails default is epairNb
+                interface = f'{interface.replace("vnet", "epair")}b'
+
+            cmd = ['jexec', f'ioc-{self.uuid}', 'ifconfig',
+                   '-f', 'inet:cidr', interface, 'inet']
+            out = su.check_output(cmd).decode()
+            address = next(
+                (line.split()[1] for line in out.splitlines()
+                 if line.split()[:1] == ['inet']), None
+            )
+            if address is None:
+                raise ValueError('No IPv4 address received')
+            address = ipaddress.IPv4Interface(address)
+            self.ip4_addr = str(address.ip)
+            addr = str(address)
+
+            if address.ip.is_unspecified:
+                failed_dhcp = True
+
+        except (su.CalledProcessError, IndexError, ValueError):
+            failed_dhcp = True
+            addr = 'ERROR, check jail logs'
+
+        if failed_dhcp:
+            iocage_lib.ioc_stop.IOCStop(
+                self.uuid, self.path, force=True, silent=True
+            )
+
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': '  + Acquiring DHCP address: FAILED,'
+                f' address received: {addr}\n'
+                f'\nStopped {self.uuid} due to DHCP failure'
+            },
+                _callback=self.callback)
+
+        iocage_lib.ioc_common.logit({
+            'level': 'INFO',
+            'message': f'  + DHCP Address: {addr}'
+        },
+            _callback=self.callback,
+            silent=self.silent)
 
     def check_aliases(self, ip_addrs, mode='4'):
         """
@@ -1385,7 +1357,7 @@ class IOCStart(object):
 
     def start_generate_resolv(self):
         resolver = self.get("resolver")
-        #                                     compat
+        # 'none' copies the host resolver; '/dev/null' keeps the jail's file.
 
         if resolver != "/etc/resolv.conf" and resolver != "none" and \
                 resolver != "/dev/null":
@@ -1410,7 +1382,7 @@ class IOCStart(object):
         m.update(nic.encode("utf-8"))
         prefix = self.get("mac_prefix")
 
-        return f"{prefix}{m.hexdigest()[0:12-len(prefix)]}"
+        return f"{prefix}{m.hexdigest()[0:12 - len(prefix)]}"
 
     def __generate_mac_address_pair(self, nic):
         mac_a = self.__generate_mac_bytes(nic)
@@ -1420,7 +1392,7 @@ class IOCStart(object):
 
     def __start_generate_vnet_mac__(self, nic):
         """
-        Generates a random MAC address and checks for uniquness.
+        Generates a random MAC address and checks for uniqueness.
         If the jail already has a mac address generated, it will return that
         instead.
         """
@@ -1441,7 +1413,7 @@ class IOCStart(object):
         return mac_a, mac_b
 
     def __check_dhcp_or_accept_rtadv__(self, ipv4, enable):
-        # legacy behavior to enable it on every NIC
+        # The global DHCP setting applies to every configured interface.
         if ipv4 and (self.conf['dhcp'] or not enable):
             nic_list = self.get('interfaces').split(',')
             nics = list(map(lambda x: x.split(':')[0], nic_list))

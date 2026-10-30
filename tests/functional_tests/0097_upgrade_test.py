@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2018, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -22,12 +22,8 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-
 import pytest
-import requests
-
-from distutils.version import StrictVersion
+import iocage_lib.ioc_common
 
 require_root = pytest.mark.require_root
 require_zpool = pytest.mark.require_zpool
@@ -35,16 +31,33 @@ require_upgrade = pytest.mark.require_upgrade
 require_nat = pytest.mark.require_nat
 
 JAIL_NAME = 'upgrade_jail'
-OLD_RELEASE = '12.1-RELEASE'
+UPGRADE_SOURCES = {
+    '14.5-RELEASE': '14.4-RELEASE',
+    '15.1-RELEASE': '14.5-RELEASE',
+}
+
+
+@pytest.fixture
+def upgrade_releases(release):
+    target = (
+        iocage_lib.ioc_common.parse_latest_release()
+        if release == 'latest' else release
+    )
+    source = UPGRADE_SOURCES.get(target)
+    if source is None:
+        pytest.skip(f'No supported upgrade source configured for {target}')
+    return source, target
 
 
 @require_root
 @require_zpool
 @require_nat
 @require_upgrade
-def test_01_create_jail_with_older_release(invoke_cli, jail):
+def test_01_create_jail_with_older_release(invoke_cli, jail, upgrade_releases):
+    source, _ = upgrade_releases
+    invoke_cli(['fetch', '-r', source])
     invoke_cli(
-        ['create', '-r', OLD_RELEASE, '-n', JAIL_NAME, 'nat=1',
+        ['create', '-r', source, '-n', JAIL_NAME, 'nat=1',
          'allow_raw_sockets=1']
     )
 
@@ -56,12 +69,13 @@ def test_01_create_jail_with_older_release(invoke_cli, jail):
 @require_root
 @require_zpool
 def test_02_upgrade_jail(
-        invoke_cli, skip_test, release, jail
+        invoke_cli, skip_test, upgrade_releases, jail
 ):
+    _, target = upgrade_releases
     jail = jail(JAIL_NAME)
 
     skip_test(not jail)
 
     invoke_cli(
-        ['upgrade', jail.name, '-r', release]
+        ['upgrade', jail.name, '-r', target]
     )

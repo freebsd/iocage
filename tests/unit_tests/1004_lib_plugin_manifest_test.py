@@ -4,7 +4,7 @@ from iocage_lib.ioc_common import validate_plugin_manifest
 
 VALID_MANIFEST = {
     "name": "test_plugin",
-    "release": "12.2-RELEASE",
+    "release": "15.1-RELEASE",
     "pkgs": [],
     "packagesite": "http://pkg.FreeBSD.org/${ABI}/latest",
     "fingerprints": {

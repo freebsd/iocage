@@ -1,7 +1,7 @@
 # Contribution guidelines
 
 Following the contribution guidelines saves everyone time, requires less back
-and forth during the review process, and helps to ensures a consistent codebase.
+and forth during the review process, and helps to ensure a consistent codebase.
 I use PyCharm for all of my programming, and these are what I use for my settings, adapt to your editor of choice.
 
 ## A few general rules first:

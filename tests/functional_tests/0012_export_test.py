@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@ def test_01_export_jail(invoke_cli, resource_selector, skip_test):
     assert os.path.isdir(jail.zfs.images_dataset_path) is True, \
         f'{jail.zfs.images_dataset_path} does not exist'
 
-    filename = f'{jail.name}_{datetime.datetime.utcnow().strftime("%F")}.zip'
+    filename = f'{jail.name}_{datetime.datetime.now(datetime.UTC).strftime("%F")}.zip'
     list_dir = os.listdir(jail.zfs.images_dataset_path)
 
     assert filename in list_dir, f'{filename} does not exist'

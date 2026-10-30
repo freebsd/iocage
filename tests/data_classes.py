@@ -125,18 +125,12 @@ class Row:
 
     def normalize_release(self):
         self.orig_release = self.release
-        # Assuming this is the format for now
-        # "11.2-RELEASE-p6" or "11.2-RELEASE"
+        # Keep the release type and optional patch level together as a suffix.
         release = self.release.split('-', 1)
         if len(release) == 1:
             self.release = (999, release[0])
         elif len(release) == 2:
             self.release = (float(release[0]), release[1])
-        else:
-            # it is of format 11.2-RELEASE-p6
-            self.release = (
-                float(release[0]), int(release[2][1:]), release[1]
-            )
 
     def normalize_state(self):
         self.state = 1 if self.state == 'down' else 0

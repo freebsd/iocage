@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -229,10 +229,10 @@ def sort_created(crt):
     """Sort snaplist by CREATED"""
 
     try:
-        _timestmp = dt.datetime.strptime(crt[1], '%a %b %d %H:%M %Y')
+        _timestamp = dt.datetime.strptime(crt[1], '%a %b %d %H:%M %Y')
     except ValueError:
-        _timestmp = crt[1]
-    return (_timestmp,) + get_name_sortkey(crt[0])
+        _timestamp = crt[1]
+    return (_timestamp,) + get_name_sortkey(crt[0])
 
 
 def sort_crt(crt):
@@ -435,7 +435,7 @@ def sort_release(releases, split=False, fetch_releases=False):
                     # Non-standard naming scheme
                     pass
 
-            # enumeration ensures 11.2-LOCAL does not take the place of 11.2-R
+            # Enumeration keeps local builds distinct from official releases.
             r_dict[f'{rel}_{i}'] = r_type
     else:
         # Length 9 (standard) or 10 (plugins) is list -l,
@@ -577,9 +577,9 @@ def open_atomic(filepath, *args, **kwargs):
         the file path to be opened
     fsync : bool
         whether to force write the file to disk
-    *args : mixed
+    ``*args`` : mixed
         Any valid arguments for :code:`open`
-    **kwargs : mixed
+    ``**kwargs`` : mixed
         Any valid keyword arguments for :code:`open`
     """
     fsync = kwargs.get('fsync', False)
@@ -704,7 +704,7 @@ def get_host_release():
     release = rel.rsplit("-", 1)[0]
 
     if "-STABLE" in rel:
-        # FreeNAS
+        # Stable kernels and derivative hosts use the corresponding release.
         release = f"{release}-RELEASE"
     elif "-HBSD" in rel:
         # HardenedBSD
@@ -927,19 +927,14 @@ def consume_and_log(exec_gen, log=True, callback=None):
 
 def get_jail_freebsd_version(path, release):
     """Checks the current patch level for the jail"""
-    if release[:4].endswith('-'):
-        # 9.3-RELEASE and under don't actually have this binary
-        new_release = release
-    else:
-        with open(
-            f'{path}/bin/freebsd-version', mode='r', encoding='utf-8'
-        ) as r:
-            for line in r:
-                if line.startswith('USERLAND_VERSION'):
-                    new_release = line.rstrip().partition('=')[
-                        2].strip('"')
+    with open(
+        f'{path}/bin/freebsd-version', mode='r', encoding='utf-8'
+    ) as version_file:
+        for line in version_file:
+            if line.startswith('USERLAND_VERSION='):
+                return line.rstrip().partition('=')[2].strip('"')
 
-    return new_release
+    raise ValueError(f'USERLAND_VERSION not found in {path}/bin/freebsd-version')
 
 
 def truthy_values():
@@ -1043,7 +1038,7 @@ def gen_nat_ip(ip_prefix):
 
 def get_used_ips():
     """
-    Run ifconfig in every jail and return an iteratable of the inuse addresses
+    Run ifconfig in every jail and return an iterable of the addresses in use.
     """
     jails = json.loads(
         su.run(

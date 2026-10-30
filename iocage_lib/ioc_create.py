@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -170,8 +170,8 @@ class IOCCreate(object):
                             )
                     else:
                         cloned_release = "EMPTY"
-            except (IOError, OSError, FileNotFoundError, UnboundLocalError):
-                # Unintuitevly a missing template will throw a
+            except (OSError, UnboundLocalError):
+                # Unexpectedly, a missing template will throw an
                 # UnboundLocalError as the missing file will kick the
                 # migration routine for zfs props. We don't need that :)
 
@@ -764,7 +764,7 @@ class IOCCreate(object):
             import dns.resolver
             import dns.exception
             try:
-                dns.resolver.query(repo)
+                dns.resolver.resolve(repo, search=True)
             except dns.resolver.NoNameservers:
                 iocage_lib.ioc_common.logit({
                     'level': 'EXCEPTION',

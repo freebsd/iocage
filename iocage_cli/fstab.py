@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ __rootcmd__ = True
               help="Removes an entry from the jails fstab and unmounts it.",
               flag_value="remove")
 @click.option("--edit", "-e", "action",
-              help="Opens up the fstab file in your environments EDITOR.",
+              help="Opens up the fstab file in your environment's EDITOR.",
               flag_value="edit")
 @click.option("--replace", "-R",
               help="Replace an entry by index number", nargs=1)

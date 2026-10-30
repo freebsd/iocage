@@ -89,8 +89,8 @@ class Dataset(Resource):
     @property
     def locked(self):
         return (
-            self.properties.get('encryption', 'off') != 'off'
-            and self.properties.get('keystatus', 'available') != 'available'
+            self.properties['encryption'] != 'off'
+            and self.properties['keystatus'] != 'available'
         )
 
     def destroy(self, recursive=False, force=False):

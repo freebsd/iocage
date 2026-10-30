@@ -24,7 +24,7 @@ Clone (default)
 
 Clone jails are created with:
 
-:samp:`# iocage create -r 11.0-RELEASE`
+:samp:`# iocage create -r 15.1-RELEASE`
 
 Clone jails are duplicated from the appropriate RELEASE at creation
 time. These consume a small amount of space, preserving only the
@@ -73,7 +73,7 @@ And new jails with the user customized networking can be created:
 
 :samp:`# iocage create -t examplejail -n newexamplejail`
 
-Template jails are convertable by setting the *template=*
+Template jails are convertible by setting the *template=*
 property.
 
 .. index:: Empty Jails
@@ -94,9 +94,9 @@ jails.
 Thickjail
 ---------
 
-Thickjails jails are created with:
+Thickjails are created with:
 
-:samp:`# iocage create -T -r 11.2-RELEASE`
+:samp:`# iocage create -T -r 15.1-RELEASE`
 
 Thickjails are copied from the appropriate RELEASE at creation
 time. These consume a large amount of space, but are fully independent.

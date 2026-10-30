@@ -37,5 +37,8 @@ jobs:
       - id: deployment
         uses: sphinx-notes/pages@v3
         with:
-          sphinx_build_options: -b html -D version=${{ steps.computed-tag.outputs.tag }} -D release=${{ steps.computed-tag.outputs.tag }} -c ./doc/source
+          python_version: "3.14"
+          requirements_path: ./requirements-doc.txt
+          pyproject_extras: ""
+          sphinx_build_options: -W -b html -D version=${{ steps.computed-tag.outputs.tag }} -D release=${{ steps.computed-tag.outputs.tag }} -c ./doc/source
           documentation_path: ./doc/source

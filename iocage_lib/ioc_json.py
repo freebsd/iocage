@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -184,8 +184,8 @@ class IOCCpuset(object):
             )
         except iocage_lib.ioc_exceptions.CommandFailed:
             failed = True
-        finally:
-            return failed
+
+        return failed
 
     @staticmethod
     def retrieve_cpu_sets():
@@ -204,8 +204,8 @@ class IOCCpuset(object):
             )
             if result:
                 cpu_sets = int(result[0])
-        finally:
-            return cpu_sets
+
+        return cpu_sets
 
     @staticmethod
     def validate_cpuset_prop(value, raise_error=True):
@@ -329,8 +329,8 @@ class IOCRCTL(object):
             if f'jail:{self.jail_name}{"" if not prop else f":{prop}"}' \
                     in output.stdout:
                 rctl_enabled = True
-        finally:
-            return rctl_enabled
+
+        return rctl_enabled
 
     @staticmethod
     def validate_rctl_tunable():
@@ -1001,12 +1001,7 @@ class IOCConfiguration:
                 }
             )
 
-        if release[:4].endswith('-'):
-            # 9.3-RELEASE and under don't actually have this binary.
-            release = conf['release']
-        elif release == 'EMPTY':
-            pass
-        else:
+        if release != 'EMPTY':
             try:
                 release = iocage_lib.ioc_common.get_jail_freebsd_version(
                     freebsd_version_path, release
@@ -1510,7 +1505,6 @@ class IOCJson(IOCConfiguration):
         """Load the JSON at the location given. Returns a JSON object."""
         jail_type, jail_uuid = self.location.rsplit("/", 2)[-2:]
         full_uuid = jail_uuid  # Saves jail_uuid for legacy ZFS migration
-        legacy_short = False
 
         jail_dataset = Dataset(
             os.path.join(self.pool, 'iocage', jail_type, jail_uuid)
@@ -1699,26 +1693,6 @@ class IOCJson(IOCConfiguration):
                     with open(self.location + "/config.json", "r") as conf:
                         conf = json.load(conf)
 
-                    if legacy_short:
-                        messages = collections.OrderedDict(
-                            [("1-NOTICE", "*" * 80),
-                             ("2-WARNING",
-                              f"Jail: {full_uuid} was renamed to {uuid}"),
-                             ("3-NOTICE",
-                              f"{'*' * 80}\n"),
-                             ("4-EXCEPTION",
-                              "Please issue your command again.")])
-
-                        for level, msg in messages.items():
-                            level = level.partition("-")[2]
-
-                            iocage_lib.ioc_common.logit(
-                                {
-                                    "level": level,
-                                    "message": msg
-                                },
-                                _callback=self.callback,
-                                silent=self.silent)
                 except su.CalledProcessError:
                     # At this point it should be a real misconfigured jail
                     raise RuntimeError("Configuration is missing!"
@@ -2300,7 +2274,7 @@ class IOCJson(IOCConfiguration):
                     # 4 - interface|DHCP
                     # 5 - interface|accept_rtadv
                     # All the while of course assuming that we can
-                    # have more then one ip
+                    # have more than one ip
                     if key == 'ip4_addr':
                         ip_check = ipaddress.IPv4Network
                     else:

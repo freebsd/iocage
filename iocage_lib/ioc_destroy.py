@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -171,7 +171,7 @@ class IOCDestroy:
         if dataset.endswith('jails'):
             # We need to make sure we remove the snapshots from the RELEASES
             # We are purposely not using -R as those will hit templates
-            # and we are not using IOCSnapshot for perfomance
+            # and we are not using IOCSnapshot for performance
             for snap in SnapshotListableResource().release_snapshots:
                 snap.destroy(recursive=True, force=True)
         if 'templates' in dataset:

@@ -12,23 +12,27 @@ classifiers = [
   "Operating System :: POSIX :: BSD :: FreeBSD",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14"
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15"
 ]
-requires-python = ">=3.9"
+# Archive extraction requires the tarfile filters added in Python 3.11.4.
+requires-python = ">=3.11.4"
 readme = "README.md"
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
 
 dependencies = [
-    "click>=6.7",
+    "click>=8.3.1",
     "coloredlogs>=9.0",
     "requests>=2.18.4",
     "texttable>=1.2.1",
+    "netifaces>=0.10.8",
+    "GitPython>=2.1.11",
+    "dnspython>=2.0.0",
+    "jsonschema>=3.2.0",
 ]
 
 [project.urls]
@@ -54,8 +58,12 @@ exclude = ["*.orig"]
 include = [
     "iocage_cli/*.py",
     "iocage_lib/*.py",
+    "iocage_lib/plugin_manifest.json",
     "pyproject.toml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "rc.d/iocage",
+    "iocage.8",
+    "zsh-completion/_iocage"
 ]
 exclude = ["*.orig"]

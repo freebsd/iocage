@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -239,14 +239,14 @@ class IOCStop(object):
         destroy_nic = True if dhcp or ip4_addr != 'none' or \
             ip6_addr != 'none' or (nat and vnet) else False
 
-        # disconnect vnet_interfaces from jail before stoppping
+        # disconnect vnet_interfaces from jail before stopping
         if vnet and self.conf["vnet_interfaces"] != 'none':
             vnet_err = []
 
             for nic in self.conf["vnet_interfaces"].split(","):
                 try:
                     iocage_lib.ioc_common.checkoutput(
-                        ["ifconfig",f"{nic}", "-vnet", f"ioc-{self.uuid}"],
+                        ["ifconfig", f"{nic}", "-vnet", f"ioc-{self.uuid}"],
                         stderr=su.STDOUT)
                 except su.CalledProcessError as err:
                     vnet_err.append(err.output.decode().rstrip())

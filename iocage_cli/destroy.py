@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -53,7 +53,7 @@ def child_test(iocroot, name, _type, force=False, recursive=False):
             ioc_common.logit({
                 "level": "WARNING",
                 "message": "Partial UUID/NAME supplied, cannot check for "
-                           "dependant jails."
+                           "dependent jails."
             })
 
             if not click.confirm("\nProceed?"):

@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -78,5 +78,5 @@ def cli(command, jail, host_user, jail_user, force, keep_proxy):
         ioc_common.logit({
             'level': 'EXCEPTION',
             'message': 'Command failed!\n'
-                       f'Exception: "{e.__class__.__name__}:{str(e)}" occured'
+                       f'Exception: "{e.__class__.__name__}:{str(e)}" occurred'
         })

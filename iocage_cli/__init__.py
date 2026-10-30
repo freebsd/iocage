@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -36,8 +36,6 @@ import sys
 import click
 import coloredlogs
 import iocage_lib.ioc_check as ioc_check
-# This prevents it from getting in our way.
-from click import core
 from iocage_lib.ioc_common import set_interactive
 
 import importlib.metadata
@@ -47,7 +45,6 @@ try:
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0"  # Fallback for development mode
 
-core._verify_python3_env = lambda: None
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
@@ -168,7 +165,7 @@ class IOCLogger(object):
 cmd_folder = os.path.abspath(os.path.dirname(__file__))
 
 
-class IOCageCLI(click.MultiCommand):
+class IOCageCLI(click.Group):
 
     """
     Iterates in the 'cli' directory and will load any module's cli definition.

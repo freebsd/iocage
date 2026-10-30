@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -236,7 +236,7 @@ class IOCFstab(object):
                         ).index(self.dest) or self.action == 'add'
                     ):
                         # We need to make sure that this is not raised
-                        # when replacing some option other then src/destination
+                        # when replacing some option other than src/destination
                         verrors.append(
                             f'Destination: {self.dest} already exists!'
                         )
@@ -380,7 +380,7 @@ class IOCFstab(object):
             for line in self.fstab:
                 fstab.write(f'{line}\n')
 
-            date = datetime.datetime.utcnow().strftime("%F %T")
+            date = datetime.datetime.now(datetime.UTC).strftime("%F %T")
             fstab.write(f'{self.mount} # Added by iocage on {date}\n')
 
         iocage_lib.ioc_common.logit({
@@ -488,7 +488,7 @@ class IOCFstab(object):
 
                 for i, line in enumerate(self.fstab):
                     if i == self.index:
-                        date = datetime.datetime.utcnow().strftime("%F %T")
+                        date = datetime.datetime.now(datetime.UTC).strftime("%F %T")
                         fstab.write(
                             f"{self.mount} # Added by iocage on {date}\n")
                         matched = True

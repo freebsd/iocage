@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,8 @@ from iocage_lib.snapshot import SnapshotListableResource, Snapshot
 # its consumers can be removed, but places using the workaround
 # need to be changed to use flag_value=False instead of
 # is_flag=True (and change default to True).
-CLICK_WORKAROUND=True
+CLICK_WORKAROUND = True
+
 
 class PoolAndDataset:
 
@@ -561,14 +562,6 @@ class IOCage:
             else:
                 files = ['MANIFEST', 'base.txz', 'lib32.txz', 'src.txz']
 
-            try:
-                if int(release.rsplit('-')[0].rsplit('.')[0]) < 12:
-                    # doc.txz has relevance here still
-                    files.append('doc.txz')
-            except (AttributeError, ValueError):
-                # Non-standard naming scheme, assuming it's current
-                pass
-
             ioc_fetch.IOCFetch(
                 release,
                 hardened=hardened,
@@ -685,7 +678,7 @@ class IOCage:
 
     def destroy_jail(self, force=False):
         """
-        Destroys the supplied jail, to reduce perfomance hit,
+        Destroys the supplied jail, to reduce performance hit,
         call IOCage with skip_jails=True
         """
         try:
@@ -1029,14 +1022,6 @@ class IOCage:
                     kwargs['files'] = ['MANIFEST', 'base.txz', 'lib32.txz',
                                        'src.txz']
 
-                    try:
-                        if int(release.rsplit('-')[0].rsplit('.')[0]) < 12:
-                            # doc.txz has relevance here still
-                            kwargs['files'].append('doc.txz')
-                    except (AttributeError, ValueError):
-                        # Non-standard naming scheme, assuming it's current
-                        pass
-
             if "HBSD" in freebsd_version:
                 if kwargs["server"] == "download.freebsd.org":
                     kwargs["hardened"] = True
@@ -1145,21 +1130,8 @@ class IOCage:
         """Adds an fstab entry for a jail"""
         uuid, path = self.__check_jail_existence__()
 
-        if action != "list":
-            if add_path:
-                destination = f"{self.iocroot}/jails/{uuid}/root{destination}"
-
-            if destination and len(destination) > 88:
-                ioc_common.logit(
-                    {
-                        "level":
-                        "WARNING",
-                        "message":
-                        "The destination's mountpoint exceeds 88 "
-                        "characters, this may cause failure!"
-                    },
-                    _callback=self.callback,
-                    silent=self.silent)
+        if action != "list" and add_path:
+            destination = f"{self.iocroot}/jails/{uuid}/root{destination}"
 
         if action == "list":
             fstab = ioc_fstab.IOCFstab(
@@ -1737,7 +1709,7 @@ class IOCage:
     def snapshot_all(self, name):
         # We want a consistent name across a snapshot batch.
         if not name:
-            name = datetime.datetime.utcnow().strftime("%F_%T")
+            name = datetime.datetime.now(datetime.UTC).strftime("%F_%T")
         self._all = False
         for jail in self.jails:
             self.jail = jail
@@ -1748,7 +1720,7 @@ class IOCage:
         if self._all:
             self.snapshot_all(name)
             return
-        date = datetime.datetime.utcnow().strftime("%F_%T")
+        date = datetime.datetime.now(datetime.UTC).strftime("%F_%T")
         uuid, path = self.__check_jail_existence__()
 
         # If they don't supply a snapshot name, we will use the date.
@@ -1817,7 +1789,7 @@ class IOCage:
             ] + exec_start
             su.Popen(start_cmd, stdout=su.PIPE, stderr=su.PIPE).communicate()
             ioc_json.IOCJson(path, silent=True).json_set_value(
-                f"last_started={datetime.datetime.utcnow().strftime('%F %T')}")
+                f"last_started={datetime.datetime.now(datetime.UTC).strftime('%F %T')}")
         else:
             ioc_common.logit(
                 {
@@ -2173,7 +2145,7 @@ class IOCage:
             self.silent = _silent
 
         if basejail:
-            _date = datetime.datetime.utcnow().strftime("%F")
+            _date = datetime.datetime.now(datetime.UTC).strftime("%F")
             msg = f"""\
 \n{uuid} successfully upgraded from {jail_release} to {new_release}!
 Please reboot the jail and inspect.

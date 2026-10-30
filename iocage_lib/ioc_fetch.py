@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,8 @@ from iocage_lib.dataset import Dataset
 # basically the same, but **without**:
 # - Clear high mode bits (setuid, setgid, sticky) and
 #   group/other write bits (S_IWGRP | S_IWOTH).
+
+
 def untar_release_filter(member, dest_path):
     new_attrs = {}
     name = member.name
@@ -71,6 +73,7 @@ def untar_release_filter(member, dest_path):
     if new_attrs:
         return member.replace(**new_attrs, deep=False)
     return member
+
 
 class IOCFetch:
 
@@ -319,6 +322,7 @@ class IOCFetch:
         Fetch a user specified RELEASE from FreeBSD's http server or a user
         supplied one. The user can also specify the user, password and
         root-directory containing the release tree that looks like so:
+
             - XX.X-RELEASE
             - XX.X-RELEASE
             - XX.X-RELEASE
@@ -649,10 +653,6 @@ class IOCFetch:
                             },
                             _callback=self.callback,
                             silent=self.silent)
-                        if f == 'doc.txz':
-                            # some releases might not have it,
-                            # it is safe to skip
-                            self.files_left.remove(f)
                         continue
 
                 if not missing and f in _list:
@@ -837,7 +837,7 @@ class IOCFetch:
             })
 
         with tarfile.open(src) as f:
-            # Extracting over the same files is much slower then
+            # Extracting over the same files is much slower than
             # removing them first.
             member = self.__fetch_extract_remove__(f)
             member = self.__fetch_check_members__(member)
@@ -1037,7 +1037,7 @@ class IOCFetch:
             try:
                 # . and so forth won't like this.
                 os.remove(rel_path)
-            except (IOError, OSError):
+            except OSError:
                 pass
 
             members.append(f)

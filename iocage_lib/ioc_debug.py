@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -36,21 +36,11 @@ from iocage_lib.pools import PoolListableResource
 class IOCDebug(object):
     """
     Collects the following debug for a system + jails/templates:
-        Host side
-        ----------
-        zfs list
-        mount
-        df -h
 
-        Jail side
-        ----------
-        iocage get all
-        /etc/hosts
-        /etc/rc.conf
-        /etc/nsswitch.conf
-        ifconfig -a
-        netstat -nr
-        /etc/resolv.conf
+    * Host: ``zfs list``, ``mount``, and ``df -h``.
+    * Jails: ``iocage get all``, ``/etc/hosts``, ``/etc/rc.conf``,
+      ``/etc/nsswitch.conf``, ``ifconfig -a``, ``netstat -nr``, and
+      ``/etc/resolv.conf``.
     """
 
     def __init__(self, path, silent=False, callback=None):

@@ -19,14 +19,20 @@ class Resource:
     @property
     def properties(self):
         if not self._properties:
-            if self.cache and self.resource_name in iocage_cache.datasets:
-                self._properties = iocage_cache.datasets[self.resource_name]
+            if self.cache:
+                cached_properties = (
+                    iocage_cache.pools if self.zfs_resource == 'zpool'
+                    else iocage_cache.datasets
+                )
+                self._properties = cached_properties.get(self.resource_name)
             if not self._properties:
                 # For cases where we are using this for datasets which are not under
                 # ioc pool, we don't cache that data and it has to be retrieved in
                 # this case
                 self._properties = properties(self.resource_name, self.zfs_resource)
-                iocage_cache.update_dataset_data(self.resource_name, self._properties)
+                # Pools and their root datasets share a name, but not properties.
+                if self.zfs_resource == 'zfs':
+                    iocage_cache.update_dataset_data(self.resource_name, self._properties)
         return self._properties
 
     def set_property(self, prop, value):

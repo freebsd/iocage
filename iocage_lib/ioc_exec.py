@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,6 @@ import iocage_lib.ioc_exceptions
 import select
 import fcntl
 import os
-import re
 import collections
 
 
@@ -42,8 +41,7 @@ class IOCExec(object):
         self,
         command,
         path,
-        # None is special for RELEASE updating to work around
-        # freebsd-update weirdness
+        # None skips jail checks and exit-status errors for fetched releases.
         uuid='',
         host_user='root',
         jail_user=None,
@@ -219,7 +217,6 @@ class IOCExec(object):
         # ... <hangs>
         # postgresql rc.d command never closes the pipe
         stderr_queue = collections.deque(maxlen=30)
-        rtrn_stdout = _rtrn_stdout = rtrn_stderr = b''
 
         for i in ('stdout', 'stderr'):
             fileno = getattr(self.proc, i).fileno()
@@ -240,37 +237,25 @@ class IOCExec(object):
                     timeout = 0
 
             if r:
+                rtrn_stdout = rtrn_stderr = b''
                 if self.proc.stdout.fileno() in r:
                     rtrn_stdout = self.proc.stdout.read()
 
-                    if rtrn_stdout:
-                        _rtrn_stdout = rtrn_stdout
                 if self.proc.stderr.fileno() in r:
                     rtrn_stderr = self.proc.stderr.read()
-                    stderr_queue.append(rtrn_stderr)
+                    if rtrn_stderr:
+                        stderr_queue.append(rtrn_stderr)
 
                 if not self.decode:
                     yield rtrn_stdout, rtrn_stderr
                 else:
                     yield rtrn_stdout.decode(), rtrn_stderr.decode()
 
-        error = True if self.proc.returncode != 0 else False
-
-        # self.uuid being None means a RELEASE being updated,
-        # We will get false positives for EOL notices
-        if error and self.uuid is not None:
-            # EOL notice for jail updates
-            jail_eol_regex = \
-                rb'(WARNING: FreeBSD \d*\.\d-RELEASE HAS PASSED ITS'\
-                rb' END-OF-LIFE DATE)'
-
-            if re.search(jail_eol_regex, _rtrn_stdout):
-                error = False
-
-            if error:
-                raise iocage_lib.ioc_exceptions.CommandFailed(
-                    list(stderr_queue)
-                )
+        # An up-to-date fetched release has no pending updates to install.
+        if self.proc.returncode != 0 and self.uuid is not None:
+            raise iocage_lib.ioc_exceptions.CommandFailed(
+                list(stderr_queue)
+            )
 
 
 class SilentExec(object):

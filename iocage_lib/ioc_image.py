@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2019, iocage
+# Copyright (c) 2014-2026, iocage
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,7 @@ class IOCImage(object):
         self.pool = iocage_lib.ioc_json.IOCJson().json_get_value("pool")
         self.iocroot = iocage_lib.ioc_json.IOCJson(
             self.pool).json_get_value("iocroot")
-        self.date = datetime.datetime.utcnow().strftime("%F")
+        self.date = datetime.datetime.now(datetime.UTC).strftime("%F")
         self.callback = callback
         self.silent = silent
 

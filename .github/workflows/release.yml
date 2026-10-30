@@ -22,15 +22,17 @@ jobs:
         with:
           ref: ${{ inputs.version }}
           path: iocage-${{ inputs.version }}
-      - name: "Build documentation"
-        uses: ammaraskar/sphinx-action@master
+      - uses: actions/setup-python@v7
         with:
-          docs-folder: iocage-${{ inputs.version }}/doc/source/
-          build-command: >
-            sphinx-build
-            -D version=${{ inputs.version }}
-            -D release=${{ inputs.version }}
-            -b html . ../../docs
+          python-version: "3.14"
+      - name: "Build documentation"
+        working-directory: iocage-${{ inputs.version }}
+        run: |
+          python -m pip install -r requirements-doc.txt
+          python -m sphinx -W \
+            -D version=${{ inputs.version }} \
+            -D release=${{ inputs.version }} \
+            -b html doc/source docs
       - uses: ksm2/archive-action@v1
         env:
           # node20 is deprecated, force node24 until

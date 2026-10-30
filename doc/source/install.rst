@@ -7,49 +7,61 @@ Install iocage
 iocage is a jail and container manager merging some of the best features
 and technologies from the FreeBSD operating system. It is geared for
 ease of use with simple command syntax. Visit the
-`iocage github <https://github.com/freebsd/iocage>`_ for more information.
+`iocage GitHub <https://github.com/freebsd/iocage>`_ for more information.
+
+Requirements
+++++++++++++
+
+iocage supports releases maintained by the
+`FreeBSD Security Team <https://www.freebsd.org/security/#sup>`_
+and requires Python 3.11.4 or newer. Python 3.11 through 3.15 are tested.
+Derivative systems must provide the same jail and ZFS interfaces.
+
+The examples below use FreeBSD ``15.1-RELEASE`` and Python 3.14.
 
 Using binary packages
 +++++++++++++++++++++
 
 To install using binary packages on a FreeBSD system, run:
 
-:samp:`sudo pkg install py311-iocage`
+:samp:`sudo pkg install py314-iocage`
 
-Using github
+Using GitHub
 ++++++++++++
 
-If installing from github, the FreeBSD source tree **must** be located
-at :samp:`$SRC_BASE` ( :samp:`/usr/src` by default).
+To install from GitHub, run these commands:
 
-To install from github, run these commands:
-
-:samp:`pkg install python git-lite py311-cython py311-libzfs py311-pip`
+:samp:`pkg install python314 git py314-pip py314-jsonschema`
 
 :samp:`git clone https://github.com/freebsd/iocage`
 
-:samp:`make install` as root.
+:samp:`cd iocage`
 
-.. tip:: To install subsequent updates run: :samp:`make install` as
-   root.
+:samp:`python3.14 -m pip install .` as root.
+
+.. tip:: To install subsequent updates run:
+   :samp:`python3.14 -m pip install .` as root.
 
 Using pkg(8)
 ++++++++++++
 
-It is possible to install pre-build packages using pkg(8) if using
-FreeBSD 10 or above.
+Pre-built packages are available using pkg(8).
 
 To install using pkg(8), run:
 
-:samp:`sudo pkg install py311-iocage`
+:samp:`sudo pkg install py314-iocage`
 
 Building Ports
 ++++++++++++++
 
-iocage is in the FreeBSD ports tree as sysutils/py-iocage.
+iocage is in the FreeBSD ports tree as ``sysutils/iocage``.
 
-Build the ports:
-:samp:`cd /usr/ports/sysutils/iocage/ ; make install clean`
+Build the port for Python 3.14:
+
+.. code-block:: sh
+
+   cd /usr/ports/sysutils/iocage/
+   make BUILD_ALL_PYTHON_FLAVORS=yes FLAVOR=py314 install clean
 
 Upgrading from :samp:`iocage_legacy`
 ++++++++++++++++++++++++++++++++++++
@@ -57,7 +69,7 @@ Upgrading from :samp:`iocage_legacy`
 This repository replaces :samp:`iocage_legacy` .
 To upgrade to the current version:
 
-1. Stop the jails ( :samp:`Service iocage stop; iocage stop ALL`)
+1. Stop the jails ( :samp:`service iocage stop; iocage stop ALL`)
 #. Back up your data.
 #. Remove the old :samp:`iocage` package if it is installed
    ( :samp:`pkg delete iocage`)
@@ -91,7 +103,7 @@ Copy Old Data
 -------------
 
 Before data can be copied, another symlink must be created in the root
-directory. Ezjail relies on symlinks to utlilize the basejail system,
+directory. Ezjail relies on symlinks to utilize the basejail system,
 however when looking in an existing jail, it’s symlinked to the root.
 
 ::
@@ -127,18 +139,19 @@ Release
 ~~~~~~~
 
 The release info can be found in the old basejail files via the
-``freebsd-update`` executable.
+``freebsd-version`` executable.
 
 ::
 
     $ grep USERLAND_VERSION= /usr/jails/basejail/bin/freebsd-version
-    USERLAND_VERSION="11.1-RELEASE-p6"
+    USERLAND_VERSION="15.1-RELEASE-p4"
 
-This value goes into the “release” line of ``config.json``
+Copy the full detected value, including any patch suffix, into the
+``release`` field of ``config.json``:
 
 ::
 
-    "release": "11.1-RELEASE-p6",
+    "release": "15.1-RELEASE-p4",
 
 IP Address
 ~~~~~~~~~~

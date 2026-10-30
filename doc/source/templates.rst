@@ -17,7 +17,7 @@ by :command:`iocage`.
 
 **Create a template with iocage:**
 
-1. Create a jail: :samp:`# iocage create -r 11.0-RELEASE -n mytemplate`.
+1. Create a jail: :samp:`# iocage create -r 15.1-RELEASE -n mytemplate`.
 2. Configure the jail's networking.
 3. Install packages and/or customize the jail as needed.
 4. Once finished with customization, stop the jail:

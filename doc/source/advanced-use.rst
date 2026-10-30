@@ -310,3 +310,9 @@ Now, create a jail and supply :file:`pkgs.json`:
    assigns an UUID to the jail if **[-n | --name]** is not used.
 
 This installs **nginx** and **tmux** in the newly created jail.
+
+If a requested package cannot be installed after three attempts, creation
+reports the failed packages and exits with status 1. The remaining packages
+are still attempted. The partially configured jail and any installed packages
+are retained for inspection. A jail started only for package installation is
+stopped, and a template's readonly property is restored.

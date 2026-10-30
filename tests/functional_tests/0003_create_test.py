@@ -219,6 +219,65 @@ def test_10_create_jail_and_install_packages(
 
 @require_root
 @require_zpool
+@require_networking
+@pytest.mark.parametrize('template', [
+    False,
+    pytest.param(True, marks=require_jail_ip),
+])
+def test_create_reports_missing_package(
+    release, jail, invoke_cli, jail_ip, nat, tmp_path, template
+):
+    suffix = uuid.uuid4().hex[:8]
+    name = f'pkg_failure_{suffix}'
+    missing = f'iocage-nonexistent-package-{uuid.uuid4().hex}'
+    pkglist = tmp_path / 'pkgs.json'
+    pkglist.write_text(json.dumps({'pkgs': [missing, 'nano']}))
+    command = ['create', '-r', release, '-n', name, '-p', pkglist]
+
+    if template:
+        command.append('template=yes')
+    else:
+        command.append('boot=on')
+
+    if jail_ip:
+        command.append(f'ip4_addr={jail_ip}')
+    elif nat:
+        command.append('nat=1')
+    else:
+        command.append('dhcp=on')
+
+    resource = jail(name)
+    resource.zfs.set_pool()
+
+    try:
+        result = invoke_cli(command, assert_returncode=False)
+        error = result.stderr.decode('utf-8', errors='replace')
+        assert result.returncode == 1
+        assert 'pkg error:' in error
+        assert missing in error
+        assert 'successfully created!' not in result.output
+        assert resource.exists is True
+        assert resource.running is False
+        assert resource.is_template is template
+
+        if template:
+            readonly = resource.zfs.zfs_get_property(resource.path, 'readonly')
+            assert readonly == 'on'
+
+        # Inspect the retained package database without starting the jail.
+        stdout, stderr = resource.run_command(
+            ['pkg', '-r', resource.absolute_path + '/root', 'info', 'nano'],
+            jailed=False
+        )
+        assert not stderr, stderr
+        assert 'nano-' in stdout
+    finally:
+        if resource.exists:
+            invoke_cli(['destroy', '-f', name])
+
+
+@require_root
+@require_zpool
 def test_11_create_jail_specifying_few_props(release, jail, invoke_cli):
     invoke_cli(
         ['create', '-r', release, '-n', 'prop_config', 'notes=prop_jail']

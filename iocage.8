@@ -404,6 +404,10 @@ Provide a NAME instead of a UUID for the new jail.
 .It Op Fl p | -pkglist Ar TEXT
 Specify a JSON file which manages the installation of each
 package in the newly created jail.
+If a requested package fails to install after three attempts, report the
+failed packages and exit with status 1 after attempting the remaining packages.
+Retain the partially configured jail and any installed packages for inspection.
+Stop a jail started only for installation and restore template readonly state.
 .It Op Fl r | -release Ar TEXT
 Specify which RELEASE to use for the new jail.
 .It Op Fl r | -release Cm latest | Cm LATEST

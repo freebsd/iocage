@@ -120,7 +120,8 @@ class IOCCheck(object):
                 }
 
                 with DATASET_CREATION_LOCK:
-                    ds = Dataset(zfs_dataset_name, cache=self.reset_cache)
+                    # Recheck ZFS before creating a dataset missing from cache.
+                    ds = Dataset(zfs_dataset_name, cache=False)
                     if not ds.exists:
                         ds.create({'properties': dataset_options})
 

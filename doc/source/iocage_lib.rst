@@ -1,6 +1,28 @@
 iocage\_lib package
 ===================
 
+Console startup
+---------------
+
+Console validation uses the existing ``IOCCheck(reset_cache=True)`` option
+to load a fresh dataset snapshot. Exact names skip jail enumeration;
+partial names use the existing jail lookup. Other commands retain
+their existing validation behavior.
+
+``IOCExec`` and ``InteractiveExec`` accept two optional keyword-only arguments
+for reusing the context already resolved for a single execution:
+
+* ``jail_config``: the effective configuration from
+  ``IOCJson(path).json_get_value('all')``, including inherited defaults.
+* ``jail_status``: the ``(running, jid)`` tuple from
+  ``IOCList.list_get_jid(uuid)``.
+
+Passing ``None`` retains each argument's existing lookup behavior. Supply
+fresh values for the current execution; refresh both after starting a jail.
+Console does this when ``--force`` starts a stopped jail, then reuses the
+configuration for ``login_flags`` and ``exec_fib``. A failed launch after
+validation is reported without automatically restarting the jail.
+
 Submodules
 ----------
 

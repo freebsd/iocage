@@ -833,6 +833,11 @@ class IOCage:
                 _callback=self.callback,
                 silent=self.silent)
 
+        if console:
+            uuid, path = self.__check_jail_existence__()
+            self._console(uuid, path, start_jail)
+            return
+
         uuid, path = self.__check_jail_existence__()
         exec_clean = self.get('exec_clean')
 
@@ -898,25 +903,6 @@ class IOCage:
 
             command = ["pkg", "-j", jid] + list(command)
 
-        if console:
-            login_flags = self.get('login_flags').split()
-            console_cmd = ['login', '-p'] + login_flags
-
-            try:
-                ioc_exec.InteractiveExec(console_cmd, path, uuid=uuid)
-            except BaseException as e:
-                ioc_common.logit(
-                    {
-                        'level': 'ERROR',
-                        'message': 'Console failed!\nThe cause could be bad '
-                                   f'permissions for {path}/root/usr/lib.'
-                    },
-                    _callback=self.callback,
-                    silent=False
-                )
-                raise e
-            return
-
         if interactive or pkg:
             ioc_exec.InteractiveExec(
                 command,
@@ -974,6 +960,47 @@ class IOCage:
                     },
                     _callback=self.callback,
                     silent=self.silent)
+
+    def _console(self, uuid, path, start_jail):
+        """Prepare a login once and pass its context to the executor."""
+        conf = ioc_json.IOCJson(path).json_get_value('all')
+        status, jid = ioc_list.IOCList.list_get_jid(uuid)
+
+        if not status and start_jail:
+            self.start()
+            status, jid = ioc_list.IOCList.list_get_jid(uuid)
+            conf = ioc_json.IOCJson(path).json_get_value('all')
+
+        if not status:
+            force = '--force (-f)' if ioc_common.INTERACTIVE else \
+                'start_jail=True'
+            ioc_common.logit(
+                {
+                    'level': 'EXCEPTION',
+                    'message': f'{self.jail} is not running! Please supply'
+                               f' {force} or start the jail'
+                },
+                _callback=self.callback,
+                silent=self.silent)
+            return
+
+        console_cmd = ['login', '-p'] + conf['login_flags'].split()
+        try:
+            ioc_exec.InteractiveExec(
+                console_cmd, path, uuid=uuid,
+                jail_config=conf, jail_status=(status, jid)
+            )
+        except BaseException:
+            ioc_common.logit(
+                {
+                    'level': 'ERROR',
+                    'message': 'Console failed!\nThe cause could be bad '
+                               f'permissions for {path}/root/usr/lib.'
+                },
+                _callback=self.callback,
+                silent=False
+            )
+            raise
 
     def export(self, compression_algo='zip'):
         """Will export a jail"""

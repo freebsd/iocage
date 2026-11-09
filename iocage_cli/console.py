@@ -42,7 +42,7 @@ def cli(jail, force):
     ioc.IOCage(
         jail=jail,
         silent=True,
-        skip_jails='ALL' not in jail
+        skip_jails=jail != 'ALL'
     ).exec(
         None,
         console=True,

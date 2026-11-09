@@ -199,14 +199,34 @@ def test_default_prefix_resolution_keeps_existing_listing(console):
     ls.assert_called_once_with('uuid')
 
 
-def test_console_all_keeps_bulk_execution(console):
-    jail, _, _, status, _, run, _ = console
-    jail.jail = 'ALL'
-    jail._all = True
-    jail.jails = {'dev': f'{jail.iocroot}/jails/dev'}
-    jail.exec(None, console=True)
-    status.assert_called_once_with('dev')
+@pytest.mark.parametrize('name', ['SMALL', 'ALLigator', 'myALLjail'])
+def test_all_substring_is_a_single_console_target(console, name):
+    original, _, _, status, _, run, auto_start = console
+    Path(original.iocroot, 'jails', name).mkdir()
+    jail = iocage.IOCage(jail=name, silent=True, skip_jails=True)
+    with mock.patch.object(jail, 'list', side_effect=AssertionError):
+        jail.exec(None, console=True)
+    status.assert_called_once_with(name)
     run.assert_called_once()
+    assert run.call_args.args[0][5] == f'ioc-{name}'
+    auto_start.assert_not_called()
+
+
+def test_console_all_keeps_bulk_execution(console):
+    original, _, _, status, _, run, auto_start = console
+    Path(original.iocroot, 'jails', 'other').mkdir()
+    paths = {name: f'{original.iocroot}/jails/{name}'
+             for name in ('dev', 'other')}
+    with mock.patch.object(iocage.IOCage, 'list',
+                           return_value=paths) as listing:
+        jail = iocage.IOCage(jail='ALL', silent=True)
+        jail.exec(None, console=True)
+    listing.assert_called_once_with('uuid')
+    assert status.call_args_list == [mock.call('dev'), mock.call('other')]
+    assert [call.args[0][5] for call in run.call_args_list] == [
+        'ioc-dev', 'ioc-other'
+    ]
+    auto_start.assert_not_called()
 
 
 def test_executor_defaults_still_resolve_context():
@@ -221,7 +241,9 @@ def test_executor_defaults_still_resolve_context():
         assert executor.cmd[-1] == 'true'
 
 
-@pytest.mark.parametrize('name', ['dev', 'ALL'])
+@pytest.mark.parametrize('name', [
+    'dev', 'ALL', 'SMALL', 'ALLigator', 'myALLjail'
+])
 def test_console_cli_refreshes_cache_and_skips_jail_listing(name):
     run_cli_script(['console', name], '''
 result = CliRunner().invoke(iocage_cli.cli, arguments)

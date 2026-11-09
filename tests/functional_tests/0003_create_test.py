@@ -24,10 +24,15 @@
 
 import os
 import json
+import subprocess
 import tempfile
 import uuid
 
 import pytest
+
+from iocage_lib.dataset import Dataset
+from iocage_lib.ioc_json import IOCJson
+from iocage_lib.ioc_list import IOCList
 
 
 require_root = pytest.mark.require_root
@@ -215,6 +220,67 @@ def test_10_create_jail_and_install_packages(
             ['destroy', '-f', jail.name]
         )
         assert jail.exists is False, f'Failed to destroy {pkg_jail}'
+
+
+@require_root
+@require_zpool
+@require_networking
+@pytest.mark.parametrize('template', [
+    False,
+    pytest.param(True, marks=require_jail_ip),
+])
+def test_create_reports_missing_package(
+    release, invoke_cli, jail_ip, nat, tmp_path, template
+):
+    suffix = uuid.uuid4().hex[:8]
+    name = f'pkg_failure_{suffix}'
+    missing = f'iocage-nonexistent-package-{uuid.uuid4().hex}'
+    pkglist = tmp_path / 'pkgs.json'
+    pkglist.write_text(json.dumps({'pkgs': [missing, 'nano']}))
+    command = ['create', '-r', release, '-n', name, '-p', pkglist]
+
+    if template:
+        command.append('template=yes')
+    else:
+        command.append('boot=on')
+
+    if jail_ip:
+        command.append(f'ip4_addr={jail_ip}')
+    elif nat:
+        command.append('nat=1')
+    else:
+        command.append('dhcp=on')
+
+    pool = IOCJson().json_get_value('pool')
+    datasets = {
+        kind: Dataset(f'{pool}/iocage/{kind}/{name}', cache=False)
+        for kind in ('jails', 'templates')
+    }
+    resource = datasets['templates' if template else 'jails']
+
+    try:
+        result = invoke_cli(command, assert_returncode=False)
+        error = result.stderr.decode('utf-8', errors='replace')
+        assert result.returncode == 1
+        assert 'pkg error:' in error
+        assert missing in error
+        assert 'successfully created!' not in result.output
+        assert resource.exists is True
+        assert IOCList().list_get_jid(name)[0] is False
+
+        if template:
+            assert resource.properties['readonly'] == 'on'
+
+        # Inspect the retained package database without starting the jail.
+        packages = subprocess.run(
+            ['pkg', '-r', resource.path + '/root', 'info', 'nano'],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        assert packages.returncode == 0, packages.stderr
+        assert 'nano-' in packages.stdout
+    finally:
+        if any(dataset.exists for dataset in datasets.values()):
+            invoke_cli(['destroy', '-f', name])
 
 
 @require_root

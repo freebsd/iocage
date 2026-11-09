@@ -33,7 +33,6 @@ import pathlib
 import re
 import shutil
 import subprocess as su
-import requests
 import tarfile
 import tempfile
 import threading
@@ -144,6 +143,9 @@ class IOCPlugin(object):
 
     @staticmethod
     def fetch_plugin_packagesites(package_sites):
+        # Defer requests to keep HTTP imports out of console startup.
+        import requests
+
         def download_parse_packagesite(packagesite_url):
             package_site_data = {}
 
@@ -421,6 +423,9 @@ class IOCPlugin(object):
                 ).get("license", False)
 
             if license and not accept_license:
+                # Defer requests to keep HTTP imports out of console startup.
+                import requests
+
                 license_text = requests.get(license)
 
                 iocage_lib.ioc_common.logit(

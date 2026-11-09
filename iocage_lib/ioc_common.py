@@ -32,8 +32,6 @@ import stat
 import subprocess as su
 import tempfile as tmp
 
-import jsonschema
-import requests
 import datetime as dt
 import re
 import shlex
@@ -669,6 +667,9 @@ def parse_latest_release():
     """
     Returns the latest RELEASE from upstreams supported list
     """
+    # Defer requests to keep HTTP imports out of console startup.
+    import requests
+
     logging.getLogger("requests").setLevel(logging.WARNING)
     sup = "https://www.freebsd.org/security/index.html#sup"
     req = requests.get(sup)
@@ -1135,6 +1136,9 @@ def get_active_jails():
 
 
 def validate_plugin_manifest(manifest, _callback, silent):
+    # Defer jsonschema; console startup does not validate plugin manifests.
+    import jsonschema
+
     v = jsonschema.Draft7Validator(cache.plugin_manifest_schema)
 
     errors = []

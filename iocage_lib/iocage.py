@@ -34,15 +34,11 @@ import iocage_lib.ioc_common as ioc_common
 import iocage_lib.ioc_create as ioc_create
 import iocage_lib.ioc_destroy as ioc_destroy
 import iocage_lib.ioc_exec as ioc_exec
-import iocage_lib.ioc_fetch as ioc_fetch
 import iocage_lib.ioc_fstab as ioc_fstab
-import iocage_lib.ioc_image as ioc_image
 import iocage_lib.ioc_json as ioc_json
 import iocage_lib.ioc_list as ioc_list
-import iocage_lib.ioc_plugin as ioc_plugin
 import iocage_lib.ioc_start as ioc_start
 import iocage_lib.ioc_stop as ioc_stop
-import iocage_lib.ioc_upgrade as ioc_upgrade
 import iocage_lib.ioc_debug as ioc_debug
 import iocage_lib.ioc_exceptions as ioc_exceptions
 
@@ -569,6 +565,8 @@ class IOCage:
                 # Non-standard naming scheme, assuming it's current
                 pass
 
+            import iocage_lib.ioc_fetch as ioc_fetch
+
             ioc_fetch.IOCFetch(
                 release,
                 hardened=hardened,
@@ -979,6 +977,8 @@ class IOCage:
 
     def export(self, compression_algo='zip'):
         """Will export a jail"""
+        import iocage_lib.ioc_image as ioc_image
+
         uuid, path = self.__check_jail_existence__()
         status, _ = self.list("jid", uuid=uuid)
 
@@ -1046,6 +1046,8 @@ class IOCage:
                 kwargs["hardened"] = False
 
         if plugins or plugin_name:
+            import iocage_lib.ioc_plugin as ioc_plugin
+
             if _list:
                 rel_list = ioc_plugin.IOCPlugin(
                     branch=branch,
@@ -1115,6 +1117,7 @@ class IOCage:
         else:
             kwargs.pop('git_repository', None)
             kwargs.pop('git_destination', None)
+            import iocage_lib.ioc_fetch as ioc_fetch
 
             if _list:
                 if remote:
@@ -1358,6 +1361,8 @@ class IOCage:
 
     def import_(self, compression_algo='zip', path=None):
         """Imports a jail"""
+        import iocage_lib.ioc_image as ioc_image
+
         ioc_image.IOCImage().import_jail(
             self.jail, compression_algo=compression_algo, path=path
         )
@@ -1998,6 +2003,8 @@ class IOCage:
                 })
 
             if jail_type == "pluginv2" or jail_type == "plugin":
+                import iocage_lib.ioc_plugin as ioc_plugin
+
                 # TODO: Warn about erasing all pkgs
                 ioc_common.logit({
                     'level': 'INFO',
@@ -2023,6 +2030,8 @@ class IOCage:
             is_basejail = ioc_common.check_truthy(conf['basejail'])
             params = [] if is_basejail else [True, uuid]
             try:
+                import iocage_lib.ioc_fetch as ioc_fetch
+
                 ioc_fetch.IOCFetch(
                     release,
                     server,
@@ -2108,6 +2117,8 @@ class IOCage:
                 _callback=self.callback)
 
         if conf["type"] == "jail":
+            import iocage_lib.ioc_upgrade as ioc_upgrade
+
             if not status:
                 ioc_start.IOCStart(uuid, path, silent=True)
                 started = True
@@ -2146,6 +2157,8 @@ class IOCage:
                 },
                 _callback=self.callback)
         elif conf["type"] == "pluginv2":
+            import iocage_lib.ioc_plugin as ioc_plugin
+
             if not status:
                 ioc_start.IOCStart(uuid, path, silent=True)
                 started = True

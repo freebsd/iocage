@@ -30,7 +30,6 @@ import uuid as _uuid
 
 import iocage_lib.ioc_common
 import iocage_lib.ioc_json
-import iocage_lib.ioc_plugin
 import texttable
 
 from iocage_lib.dataset import Dataset
@@ -352,8 +351,10 @@ class IOCList(object):
                                   full_release, full_ip4, ip6, template,
                                   admin_portal, doc_url])
                 if self.plugin_data:
+                    import iocage_lib.ioc_plugin as ioc_plugin
+
                     if conf['plugin_repository'] not in plugin_index_data:
-                        repo_obj = iocage_lib.ioc_plugin.IOCPlugin(
+                        repo_obj = ioc_plugin.IOCPlugin(
                             git_repository=conf['plugin_repository']
                         )
                         if not os.path.exists(repo_obj.git_destination):

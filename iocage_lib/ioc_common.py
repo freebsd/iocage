@@ -23,36 +23,55 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """Common methods we reuse."""
 import collections
+import concurrent.futures
 import contextlib
+import contextvars
+import datetime as dt
+import fcntl
+import glob
 import ipaddress
+import json
 import logging
 import os
+import re
+import shlex
 import shutil
 import stat
 import subprocess as su
 import tempfile as tmp
+import threading
+import urllib.parse
 
 import jsonschema
-import requests
-import datetime as dt
-import re
-import shlex
-import glob
 import netifaces
-import concurrent.futures
-import json
-import urllib.parse
+import requests
 
 import iocage_lib.ioc_exceptions
 import iocage_lib.ioc_exec
-from iocage_lib.cache import cache
 
+from iocage_lib.cache import cache
 from iocage_lib.dataset import Dataset
 
 INTERACTIVE = False
 # 4 is a magic number for default and doesn't refer
 # to the actual ruleset 4 in devfs.rules(!)
 IOCAGE_DEVFS_RULESET = 4
+ADDRESS_LOCK = threading.Lock()
+DEVFS_LOCK = threading.Lock()
+DEVFS_LOCK_PATH = '/var/run/iocage_devfs.lock'
+JAIL_LOG_CONTEXT = contextvars.ContextVar('iocage_jail', default=None)
+
+
+@contextlib.contextmanager
+def jail_logging(name):
+    """Identify worker output without changing other threads' log behavior."""
+    token = JAIL_LOG_CONTEXT.set(name)
+
+    try:
+        yield
+    finally:
+        # Executor threads are reused, so never retain a previous jail's name.
+        JAIL_LOG_CONTEXT.reset(token)
 
 
 def callback(_log, callback_exception):
@@ -98,9 +117,21 @@ def callback(_log, callback_exception):
 
 def logit(content, _callback=None, silent=False, exception=RuntimeError):
     """Helper to check callable status of callback or call ours."""
+    jail = JAIL_LOG_CONTEXT.get()
+
+    if jail is not None:
+        content = dict(content)
+        content['message'] = f"{jail}: {content['message']}"
+
+        if content['level'] == 'EXCEPTION':
+            # Workers return typed errors with their message to the
+            # coordinator instead of losing that message to SystemExit(1).
+            content['force_raise'] = True
+
     if silent and callable(_callback) and content['level'] != 'EXCEPTION':
         # Send these through for completeness to library consumers
         _callback(content, exception)
+        return
     elif silent and content['level'] != "EXCEPTION":
         # They need to see these errors, too bad!
         return
@@ -741,8 +772,29 @@ def check_release_newer(
     return h_float < r_float
 
 
+@contextlib.contextmanager
+def devfs_ruleset_lock():
+    """Keep dynamic ruleset allocation atomic across threads and processes."""
+    # The thread lock protects this process; flock covers other iocage
+    # processes. Closing the file releases flock even when an operation fails.
+    with DEVFS_LOCK:
+        with open(DEVFS_LOCK_PATH, 'a') as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            yield
+
+
 def generate_devfs_ruleset(conf, paths=None, includes=None, callback=None,
                            silent=False):
+    """Allocate and populate a dynamic ruleset under the shared lock."""
+    with devfs_ruleset_lock():
+        return _generate_devfs_ruleset(
+            conf, paths, includes, callback, silent
+        )
+
+
+def _generate_devfs_ruleset(
+    conf, paths=None, includes=None, callback=None, silent=False
+):
     """
     Will add a per jail devfs ruleset with the specified rules,
     specifying defaults that equal devfs_ruleset 4
@@ -753,22 +805,35 @@ def generate_devfs_ruleset(conf, paths=None, includes=None, callback=None,
         ['devfs', 'rule', 'showsets'],
         stdout=su.PIPE, universal_newlines=True
     )
-    ruleset_list = [int(i) for i in devfs_rulesets.stdout.splitlines()]
+    rulesets = {int(i) for i in devfs_rulesets.stdout.splitlines()}
 
-    ruleset = int(conf["min_dyn_devfs_ruleset"])
-    while ruleset in ruleset_list:
+    # Zero is immutable and omitted by showsets, even when the configured
+    # lower bound is zero. Dynamic allocations must always use another ID.
+    ruleset = max(1, int(conf["min_dyn_devfs_ruleset"]))
+    while ruleset in rulesets:
         ruleset += 1
     ruleset = str(ruleset)
 
     # Custom devfs_ruleset configured, clone to dynamic ruleset
     if int(configured_ruleset) != IOCAGE_DEVFS_RULESET:
-        if int(configured_ruleset) != 0 and int(configured_ruleset) not in ruleset_list:
+        if (int(configured_ruleset) != 0 and
+                int(configured_ruleset) not in rulesets):
             return True, configured_ruleset, '-1'
         rules = su.run(
             ['devfs', 'rule', '-s', str(configured_ruleset), 'show'],
             stdout=su.PIPE, universal_newlines=True
-        )
-        for rule in rules.stdout.splitlines():
+        ).stdout.splitlines()
+
+        if not rules:
+            # An empty clone has no kernel reference until the jail mounts
+            # devfs. A rule without actions reserves its ID under the lock
+            # without changing device visibility or permissions.
+            su.run(
+                ['devfs', 'rule', '-s', ruleset, 'add', 'path', '*'],
+                stdout=su.PIPE, check=True
+            )
+
+        for rule in rules:
             su.run(['devfs', 'rule', '-s', ruleset, 'add'] +
                    rule.split(' ')[1:], stdout=su.PIPE)
 
@@ -991,20 +1056,31 @@ def boolean_prop_exists(supplied_props, props_to_check):
     return iocage_lib.ioc_common.lowercase_set(supplied_props) & check_set
 
 
-def gen_unused_lo_ip():
-    """Best effort to try to allocate a localhost IP for a jail"""
+def gen_unused_lo_ip(used_ips=None):
+    """Allocate a localhost IP, reserving it in the optional batch set.
+
+    Reservations cover workers that have chosen an IP but not configured it
+    on the host yet. Read and update the shared set only under ADDRESS_LOCK.
+    """
     interface_addrs = netifaces.ifaddresses('lo0')
-    inuse = [ip['addr'] for ips in interface_addrs.values() for ip in ips
-             if ip['addr'].startswith('127')]
+    inuse = {ip['addr'] for ips in interface_addrs.values() for ip in ips
+             if ip['addr'].startswith('127')}
 
-    for ip in ipaddress.IPv4Network('127.0.0.0/8'):
-        ip_exploded = ip.exploded
+    with ADDRESS_LOCK:
+        if used_ips is not None:
+            inuse.update(used_ips)
 
-        if ip_exploded == '127.0.0.0':
-            continue
+        for ip in ipaddress.IPv4Network('127.0.0.0/8'):
+            ip_exploded = ip.exploded
 
-        if ip_exploded not in inuse:
-            return ip_exploded
+            if ip_exploded == '127.0.0.0':
+                continue
+
+            if ip_exploded not in inuse:
+                if used_ips is not None:
+                    used_ips.add(ip_exploded)
+
+                return ip_exploded
 
     logit(
         {
@@ -1016,21 +1092,33 @@ def gen_unused_lo_ip():
     )
 
 
-def gen_nat_ip(ip_prefix):
-    """Best effort to try to allocate a private NAT IP for a jail"""
-    inuse = get_used_ips()
+def gen_nat_ip(ip_prefix, used_ips=None):
+    """Allocate a private NAT pair and reserve it in the optional batch set.
 
-    for i in range(256):
-        for j in range(1, 256, 4):
-            network = ipaddress.IPv4Network(
-                f'{ip_prefix}.{i}.{j}/30', strict=False
-            )
-            pair = [_ip.exploded for _ip in network.hosts()]
+    The host and jail addresses must both remain unavailable to other workers
+    until they appear on the host. Reservations stay for the entire batch.
+    """
+    # Kernel scans may overlap; only selection and reservation need the lock.
+    inuse = set(get_used_ips())
 
-            if any(x in pair for x in inuse):
-                continue
+    with ADDRESS_LOCK:
+        if used_ips is not None:
+            inuse.update(used_ips)
 
-            return pair
+        for i in range(256):
+            for j in range(1, 256, 4):
+                network = ipaddress.IPv4Network(
+                    f'{ip_prefix}.{i}.{j}/30', strict=False
+                )
+                pair = [_ip.exploded for _ip in network.hosts()]
+
+                if any(ip in inuse for ip in pair):
+                    continue
+
+                if used_ips is not None:
+                    used_ips.update(pair)
+
+                return pair
 
     logit(
         {

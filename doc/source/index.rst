@@ -39,6 +39,7 @@ Documentation:
    jailtypes
    best-practices
    advanced-use
+   parallel-start-stop
    templates
    debian
    known-issues

@@ -22,16 +22,16 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """This stops jails."""
+import os
 import subprocess as su
+
+from pathlib import Path
 
 import iocage_lib.ioc_common
 import iocage_lib.ioc_exceptions
 import iocage_lib.ioc_exec
 import iocage_lib.ioc_json
 import iocage_lib.ioc_list
-import os
-
-from pathlib import Path
 
 
 class IOCStop(object):
@@ -286,43 +286,36 @@ class IOCStop(object):
                         _callback=self.callback,
                         silent=self.silent)
 
-        # Clean up after our dynamic devfs rulesets
-        devfs_rulesets = su.run(
-            ['devfs', 'rule', 'showsets'],
-            stdout=su.PIPE, universal_newlines=True
-        )
-        ruleset_list = [int(i) for i in devfs_rulesets.stdout.splitlines()]
+        # Only the kernel ruleset operations need the shared allocation lock.
+        removed = None
 
-        if int(devfs_ruleset) in ruleset_list:
-            try:
-                su.run(
+        with iocage_lib.ioc_common.devfs_ruleset_lock():
+            devfs_rulesets = su.run(
+                ['devfs', 'rule', 'showsets'],
+                stdout=su.PIPE, universal_newlines=True
+            )
+            ruleset_list = [int(i) for i in devfs_rulesets.stdout.splitlines()]
+
+            if int(devfs_ruleset) in ruleset_list:
+                result = su.run(
                     ['devfs', 'rule', '-s', devfs_ruleset, 'delset'],
                     stdout=su.PIPE
                 )
+                removed = result.returncode == 0
 
-                iocage_lib.ioc_common.logit({
-                    "level": "INFO",
-                    "message": f'  + Removing devfs_ruleset: {devfs_ruleset}'
-                               ' OK'
-                },
-                    _callback=self.callback,
-                    silent=self.silent)
-            except su.CalledProcessError:
-                iocage_lib.ioc_common.logit({
-                    "level": 'ERROR',
-                    "message": f'  + Removing devfs_ruleset: {devfs_ruleset}'
-                               ' FAILED'
-                },
-                    _callback=self.callback,
-                    silent=self.silent)
+        if removed is None:
+            level = 'ERROR'
+            message = '  + Refusing to remove protected devfs_ruleset:' \
+                f' {devfs_ruleset}'
         else:
-            iocage_lib.ioc_common.logit({
-                "level": 'ERROR',
-                "message": '  + Refusing to remove protected devfs_ruleset:'
-                           f' {devfs_ruleset}'
-            },
-                _callback=self.callback,
-                silent=self.silent)
+            level = 'INFO' if removed else 'ERROR'
+            message = f'  + Removing devfs_ruleset: {devfs_ruleset} ' \
+                + ('OK' if removed else 'FAILED')
+
+        iocage_lib.ioc_common.logit({
+            'level': level,
+            'message': message
+        }, _callback=self.callback, silent=self.silent)
 
         # Build up a jail stop command.
         cmd = ['jail', '-q']

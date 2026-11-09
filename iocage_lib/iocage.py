@@ -24,34 +24,36 @@
 
 import collections
 import datetime
+import ipaddress
 import json
 import operator
 import os
 import subprocess as su
+import threading
 
 import iocage_lib.ioc_clean as ioc_clean
 import iocage_lib.ioc_common as ioc_common
 import iocage_lib.ioc_create as ioc_create
+import iocage_lib.ioc_debug as ioc_debug
 import iocage_lib.ioc_destroy as ioc_destroy
+import iocage_lib.ioc_exceptions as ioc_exceptions
 import iocage_lib.ioc_exec as ioc_exec
 import iocage_lib.ioc_fetch as ioc_fetch
 import iocage_lib.ioc_fstab as ioc_fstab
 import iocage_lib.ioc_image as ioc_image
 import iocage_lib.ioc_json as ioc_json
 import iocage_lib.ioc_list as ioc_list
+import iocage_lib.ioc_parallel as ioc_parallel
 import iocage_lib.ioc_plugin as ioc_plugin
 import iocage_lib.ioc_start as ioc_start
 import iocage_lib.ioc_stop as ioc_stop
 import iocage_lib.ioc_upgrade as ioc_upgrade
-import iocage_lib.ioc_debug as ioc_debug
-import iocage_lib.ioc_exceptions as ioc_exceptions
 
 from iocage_lib.cache import cache
 from iocage_lib.dataset import Dataset
 from iocage_lib.pools import Pool, PoolListableResource
 from iocage_lib.release import Release
-from iocage_lib.snapshot import SnapshotListableResource, Snapshot
-
+from iocage_lib.snapshot import Snapshot, SnapshotListableResource
 
 # Workaround for click bugs and incompatible changes introduced
 # in 8.2.x. Once we can upgrade to click 8.4.1, this and all
@@ -118,7 +120,8 @@ class IOCage:
     def reset_cache():
         cache.reset()
 
-    def __all__(self, jail_order, action, ignore_exception=False):
+    def __all__(self, jail_order, action, ignore_exception=False,
+                force=False):
         # So we can properly start these.
         self._all = False
 
@@ -129,7 +132,7 @@ class IOCage:
             status, jid = self.list("jid", uuid=uuid)
 
             if action == 'stop':
-                self.stop(j, ignore_exception=ignore_exception)
+                self.stop(j, force=force, ignore_exception=ignore_exception)
             elif action == 'start':
                 if not status:
                     err, msg = self.start(j, ignore_exception=True)
@@ -152,7 +155,7 @@ class IOCage:
                         _callback=self.callback, silent=self.silent
                     )
 
-    def __jail_order__(self, action, ignore_exception=False):
+    def __jail_order__(self, action, ignore_exception=False, force=False):
         """Helper to gather lists of all the jails by order and boot order."""
         jail_order = {}
         boot_order = {}
@@ -184,11 +187,11 @@ class IOCage:
                     reverse=_reverse))
 
         if self.rc:
-            self.__rc__(boot_order, action, ignore_exception)
+            self.__rc__(boot_order, action, ignore_exception, force)
         elif self._all:
-            self.__all__(jail_order, action, ignore_exception)
+            self.__all__(jail_order, action, ignore_exception, force)
 
-    def __rc__(self, boot_order, action, ignore_exception=False):
+    def __rc__(self, boot_order, action, ignore_exception=False, force=False):
         """Helper to start all jails with boot=on"""
         # So we can properly start these.
         self.rc = False
@@ -211,7 +214,7 @@ class IOCage:
                         _callback=self.callback, silent=self.silent
                     )
 
-                    self.stop(j, ignore_exception=ignore_exception)
+                    self.stop(j, force=force, ignore_exception=ignore_exception)
                 else:
                     message = f"{uuid} is not running!"
                     ioc_common.logit(
@@ -1827,73 +1830,353 @@ class IOCage:
                 _callback=self.callback,
                 silent=self.silent)
 
-    def start(self, jail=None, ignore_exception=False, used_ports=None):
-        """Checks jails type and existence, then starts the jail"""
+    def start(self, jail=None, ignore_exception=False, used_ports=None,
+              parallel=False, jobs=None, jails=None):
+        """Start the selected jails, sequentially unless parallel is enabled.
+
+        In parallel mode, jails supplies an explicit batch; otherwise use
+        this instance's jail or rc selection. jobs limits active operations.
+        Return a jail-to-error mapping, raising on failure unless ignored.
+        """
+        if parallel:
+            return self.__parallel__(
+                'start', jails, jobs, ignore_exception, used_ports=used_ports
+            )
+
+        if jobs is not None or jails is not None:
+            raise ValueError('jobs and jails require parallel=True')
+
         if self.rc or self._all:
             if not jail:
                 self.__jail_order__("start", ignore_exception=ignore_exception)
         else:
-            uuid, path = self.__check_jail_existence__()
-            conf = ioc_json.IOCJson(path, silent=self.silent).json_get_value(
-                'all')
-            release = conf["release"]
+            return self.__start_jail__(jail, ignore_exception, used_ports)
 
-            if release != "EMPTY":
-                release = float(release.rsplit("-", 1)[0].rsplit("-", 1)[0])
-                ioc_common.check_release_newer(release, major_only=True)
+    def __start_jail__(self, jail=None, ignore_exception=False,
+                       used_ports=None, start_dependencies=True,
+                       used_ips=None):
+        """Run the existing lifecycle after optional dependency startup."""
+        uuid, path = self.__check_jail_existence__()
+        conf = ioc_json.IOCJson(path, silent=self.silent).json_get_value(
+            'all')
+        release = conf["release"]
 
-            err, msg = self.__check_jail_type__(conf["type"], uuid)
-            depends = conf["depends"].split()
+        if release != "EMPTY":
+            release = float(release.rsplit("-", 1)[0].rsplit("-", 1)[0])
+            ioc_common.check_release_newer(release, major_only=True)
 
-            if not err:
-                for depend in depends:
-                    if depend != "none":
-                        try:
-                            self.jail = depend
-                            _is_depend = self.is_depend
-                            self.is_depend = True
-                            self.start(depend)
-                        except ioc_exceptions.JailRunning:
-                            pass
-                        finally:
-                            self.is_depend = _is_depend
+        err, msg = self.__check_jail_type__(conf["type"], uuid)
+        depends = conf["depends"].split() if start_dependencies else ()
 
-                ioc_start.IOCStart(
-                    uuid,
-                    path,
-                    silent=self.silent,
-                    callback=self.callback,
-                    is_depend=self.is_depend,
-                    suppress_exception=ignore_exception,
-                    used_ports=used_ports,
-                )
+        if not err:
+            for depend in depends:
+                if depend != "none":
+                    try:
+                        original_jail = self.jail
+                        self.jail = depend
+                        _is_depend = self.is_depend
+                        self.is_depend = True
+                        self.start(depend)
+                    except ioc_exceptions.JailRunning:
+                        pass
+                    finally:
+                        self.is_depend = _is_depend
+                        self.jail = original_jail
 
-                return False, None
+            ioc_start.IOCStart(
+                uuid,
+                path,
+                silent=self.silent,
+                callback=self.callback,
+                is_depend=self.is_depend,
+                suppress_exception=ignore_exception,
+                used_ports=used_ports,
+                used_ips=used_ips,
+            )
+
+            return False, None
+        else:
+            if jail:
+                return err, msg
             else:
-                if jail:
-                    return err, msg
-                else:
-                    ioc_common.logit(
-                        {
-                            'level': 'ERROR',
-                            'message': msg
-                        },
-                        _callback=self.callback, silent=self.silent
-                    )
-                    exit(1)
+                ioc_common.logit(
+                    {
+                        'level': 'ERROR',
+                        'message': msg
+                    },
+                    _callback=self.callback, silent=self.silent
+                )
+                exit(1)
 
-    def stop(self, jail=None, force=False, ignore_exception=False):
-        """Stops the jail."""
+    def stop(self, jail=None, force=False, ignore_exception=False,
+             parallel=False, jobs=None, jails=None):
+        """Stop the selected jails, sequentially unless parallel is enabled.
+
+        In parallel mode, jails supplies an explicit batch; otherwise use
+        this instance's jail or rc selection. jobs limits active operations.
+        Return a jail-to-error mapping, raising on failure unless ignored.
+        """
+        if parallel:
+            return self.__parallel__(
+                'stop', jails, jobs, ignore_exception, force=force
+            )
+
+        if jobs is not None or jails is not None:
+            raise ValueError('jobs and jails require parallel=True')
 
         if self.rc or self._all:
             if not jail:
-                self.__jail_order__("stop", ignore_exception=ignore_exception)
+                self.__jail_order__(
+                    "stop", ignore_exception=ignore_exception, force=force
+                )
         else:
             uuid, path = self.__check_jail_existence__()
             ioc_stop.IOCStop(
-                uuid, path, silent=self.silent,
+                uuid, path, silent=self.silent, callback=self.callback,
                 force=force, suppress_exception=ignore_exception
             )
+
+    def __parallel__(self, action, jails, jobs, ignore_exception,
+                     force=False, used_ports=None):
+        """Resolve the batch before dispatch and isolate each jail worker."""
+        try:
+            records = self.__parallel_jails__(action, jails)
+            starting = action == 'start'
+            reserved_ports = {}
+            reserved_ips = None
+
+            if starting:
+                reserved_ports = self.__parallel_ports__(records, used_ports)
+                reserved_ips = self.__parallel_ips__(records)
+
+            callback_lock = threading.Lock()
+            target_callback = (
+                self.callback if callable(self.callback)
+                else ioc_common.callback
+            )
+
+            def callback(content, exception):
+                if self.silent and not callable(self.callback):
+                    return
+
+                # Consumer callbacks may maintain mutable state. Serialize
+                # delivery without holding the lock during jail operations.
+                with callback_lock:
+                    target_callback(content, exception)
+
+            for record in records.values():
+                record['worker'].callback = callback
+
+            def operate(name):
+                with ioc_common.jail_logging(name):
+                    worker = records[name]['worker']
+                    status, _ = worker.list('jid', uuid=name)
+
+                    if status != starting:
+                        if starting:
+                            # The coordinator has satisfied dependencies;
+                            # recursive startup here would dispatch them twice.
+                            error, message = worker.__start_jail__(
+                                name, used_ports=reserved_ports.get(name),
+                                start_dependencies=False,
+                                used_ips=reserved_ips
+                            )
+
+                            if error:
+                                raise RuntimeError(message)
+                        else:
+                            worker.stop(force=force)
+
+                    # Some lifecycle failures return early instead of raising.
+                    # Confirm the final state before satisfying dependents.
+                    status, _ = worker.list('jid', uuid=name)
+
+                    if status != starting:
+                        raise RuntimeError(f'Jail did not {action}')
+
+            scheduler = ioc_parallel.IOCParallel(
+                records, action, operate, jobs=jobs, ignore=ignore_exception
+            )
+        except ValueError as error:
+            # Invalid selections or dependency/resource plans remain fatal,
+            # even when --ignore allows individual lifecycle failures.
+            ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': str(error)
+            }, _callback=self.callback)
+            return
+
+        try:
+            failures = scheduler.run()
+        except KeyboardInterrupt:
+            ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'Parallel {action} interrupted; workers settled'
+            }, _callback=self.callback)
+            raise
+
+        if failures:
+            summary = '\n'.join(
+                message if message.startswith(f'{name}: ')
+                else f'{name}: {message}'
+                for name, message in sorted(failures.items())
+            )
+            ioc_common.logit({
+                'level': 'ERROR' if ignore_exception else 'EXCEPTION',
+                'message': f'Parallel {action} failures:\n{summary}'
+            }, _callback=self.callback)
+
+        return failures
+
+    def __parallel_jails__(self, action, jails):
+        """Resolve names once and expand only pending startup prerequisites."""
+        if isinstance(jails, str):
+            raise ValueError('jails must be a sequence of jail names')
+
+        selected = list(jails) if jails is not None else (
+            [self.jail] if self.jail is not None else []
+        )
+
+        if self.rc and selected:
+            raise ValueError('--rc cannot be combined with jail names')
+
+        if 'ALL' in selected and len(selected) != 1:
+            raise ValueError('ALL cannot be combined with jail names')
+
+        bulk = self.rc or selected == ['ALL']
+
+        if bulk:
+            if self.skip_jails:
+                self.jails = self.list('uuid')
+
+            selected = list(self.jails)
+        elif not selected:
+            raise ValueError('Select jail names, ALL, or --rc')
+
+        records = {}
+
+        def resolve(name, boot_only=False, bulk_selection=False):
+            if name in records:
+                return name
+
+            # Lifecycle methods mutate identity and dispatch flags, so use a
+            # separate instance per jail. Full names avoid inventory scans;
+            # partial names still use normal lookup.
+            worker = IOCage(jail=name, silent=self.silent,
+                            callback=self.callback, skip_jails=True)
+            uuid, path = worker.__check_jail_existence__()
+            worker.jail = uuid
+            worker._all = False
+
+            if uuid in records:
+                return uuid
+
+            conf = ioc_json.IOCJson(path).json_get_value('all')
+
+            # The uuid inventory contains templates as well as jails. An
+            # explicit selection or dependency must still reject templates.
+            if bulk_selection and conf['type'] == 'template':
+                return None
+
+            if boot_only and not ioc_common.check_truthy(conf['boot']):
+                return None
+
+            running, _ = worker.list('jid', uuid=uuid)
+
+            if action == 'start' and not running:
+                error, message = self.__check_jail_type__(conf['type'], uuid)
+
+                if error:
+                    raise ValueError(message)
+
+            # Register before recursion to deduplicate shared prerequisites
+            # and terminate cycles; the scheduler rejects cycles preflight.
+            records[uuid] = {
+                'priority': int(conf['priority']),
+                'running': running,
+                'depends': [],
+                'config': conf,
+                'worker': worker
+            }
+
+            if action == 'start' and not running:
+                for dependency in conf['depends'].split():
+                    if dependency != 'none':
+                        records[uuid]['depends'].append(resolve(dependency))
+
+            return uuid
+
+        for name in selected:
+            resolve(name, boot_only=self.rc, bulk_selection=bulk)
+
+        return records
+
+    @staticmethod
+    def __parallel_ips__(records):
+        """Keep automatic allocations away from pending static addresses."""
+        addresses = set()
+
+        for record in records.values():
+            conf = record['config']
+            configured = [conf.get('localhost_ip', 'none')]
+
+            if not conf['nat']:
+                configured.extend(conf.get('ip4_addr', 'none').split(','))
+
+            for value in configured:
+                address = value.rsplit('|', 1)[-1].split('/')[0]
+
+                try:
+                    addresses.add(str(ipaddress.ip_address(address)))
+                except ValueError:
+                    # DHCP, none and other automatic address selectors.
+                    pass
+
+        return addresses
+
+    @staticmethod
+    def __parallel_ports__(records, used_ports):
+        """Reserve forwarding ports before simultaneous starts can race."""
+        pending = {}
+
+        def ports(conf):
+            return {
+                int(mapping)
+                for _, _, mapping in ioc_start.IOCStart.__parse_nat_fwds__(
+                    conf['nat_forwards']
+                )
+            }
+
+        for name, record in records.items():
+            if not record['running']:
+                conf = record['config']
+
+                if conf['nat'] and conf['nat_forwards'] != 'none':
+                    pending[name] = ports(conf)
+
+        if not pending:
+            return {}
+
+        occupied = set(used_ports or ())
+        running = ioc_common.get_jails_with_config(
+            lambda conf: conf['state'] == 'up' and conf['nat'] and
+            conf['nat_forwards'] != 'none'
+        )
+
+        for conf in running.values():
+            occupied.update(ports(conf))
+
+        for name, forwarded in pending.items():
+            if occupied.intersection(forwarded):
+                raise ValueError(f'{name}: NAT forwarding ports conflict')
+
+            occupied.update(forwarded)
+
+        # A worker must not see its own reserved ports as a conflict.
+        return {
+            name: occupied.difference(forwarded)
+            for name, forwarded in pending.items()
+        }
 
     def update_all(self, pkgs=False):
         """Runs update for all jails"""

@@ -106,7 +106,7 @@ class IOCage:
 
         self.skip_jails = skip_jails
         self.jail = jail
-        self._all = True if self.jail and 'ALL' in self.jail else False
+        self._all = self.jail == 'ALL'
         self.callback = callback
         self.is_depend = False
 

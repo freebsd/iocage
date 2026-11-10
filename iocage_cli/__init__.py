@@ -224,7 +224,8 @@ class IOCageCLI(click.MultiCommand):
     "-D",
     is_flag=True,
     help="Log debug output to the console.")
-def cli(version, force, debug):
+@click.pass_context
+def cli(ctx, version, force, debug):
     """A jail manager."""
     os.environ['IOCAGE_DEBUG'] = 'FALSE'
     logger = IOCLogger()
@@ -263,7 +264,7 @@ def cli(version, force, debug):
                 ioc_check.IOCCheck(silent=True)
 
         if not skip_check:
-            ioc_check.IOCCheck()
+            ioc_check.IOCCheck(reset_cache=ctx.invoked_subcommand == 'console')
     except RuntimeError as err:
         exit(err)
 

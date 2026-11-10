@@ -257,6 +257,33 @@ Restart
 
 :samp:`# iocage restart 26e8`
 
+.. index:: Jail Console
+.. _Jail Console:
+
+Open a Jail Console
+-------------------
+
+Use :command:`iocage console` to open a login shell in a running jail:
+
+:samp:`# iocage console www01`
+
+Supply the jail's NAME or UUID. A partial name or UUID is also accepted
+when it identifies exactly one jail; ambiguous prefixes are rejected.
+
+To start a stopped jail before opening its console, use **-f** or
+**--force**:
+
+:samp:`# iocage console --force www01`
+
+Without this option, a stopped jail must be started separately. If the
+jail stops after the console command has checked its state, the login
+fails; it does not automatically restart the jail.
+
+The console uses the jail's effective :literal:`login_flags` and
+:literal:`exec_fib` properties, including inherited defaults. The default
+:literal:`login_flags` value, :literal:`-f root`, logs in as root. Type
+:command:`exit` to leave the console.
+
 .. index:: Configure a Jail
 .. _Configure a Jail:
 

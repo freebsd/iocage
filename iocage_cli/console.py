@@ -41,7 +41,8 @@ def cli(jail, force):
     # Command is empty since this command is hardcoded later on.
     ioc.IOCage(
         jail=jail,
-        silent=True
+        silent=True,
+        skip_jails=jail != 'ALL'
     ).exec(
         None,
         console=True,

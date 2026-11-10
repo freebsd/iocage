@@ -184,8 +184,8 @@ class IOCCpuset(object):
             )
         except iocage_lib.ioc_exceptions.CommandFailed:
             failed = True
-        finally:
-            return failed
+
+        return failed
 
     @staticmethod
     def retrieve_cpu_sets():
@@ -204,8 +204,8 @@ class IOCCpuset(object):
             )
             if result:
                 cpu_sets = int(result[0])
-        finally:
-            return cpu_sets
+
+        return cpu_sets
 
     @staticmethod
     def validate_cpuset_prop(value, raise_error=True):
@@ -329,8 +329,8 @@ class IOCRCTL(object):
             if f'jail:{self.jail_name}{"" if not prop else f":{prop}"}' \
                     in output.stdout:
                 rctl_enabled = True
-        finally:
-            return rctl_enabled
+
+        return rctl_enabled
 
     @staticmethod
     def validate_rctl_tunable():

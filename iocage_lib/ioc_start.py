@@ -907,57 +907,7 @@ class IOCStart(object):
             )
 
         if not vnet_err and vnet and wants_dhcp:
-            failed_dhcp = False
-
-            try:
-                interface = self.conf['interfaces'].split(',')[0].split(
-                    ':')[0]
-
-                if 'vnet' in interface:
-                    # Jails default is epairNb
-                    interface = f'{interface.replace("vnet", "epair")}b'
-
-                # We'd like to use ifconfig -f inet:cidr here,
-                # but only FreeBSD 11.0 and newer support it...
-                cmd = ['jexec', f'ioc-{self.uuid}', 'ifconfig',
-                       interface, 'inet']
-                out = su.check_output(cmd)
-
-                # ...so we extract the ip4 address and mask,
-                # and calculate cidr manually
-                addr_split = out.splitlines()[2].split()
-                self.ip4_addr = addr_split[1].decode()
-                hexmask = addr_split[3].decode()
-                maskcidr = sum([bin(int(hexmask, 16)).count('1')])
-
-                addr = f'{self.ip4_addr}/{maskcidr}'
-
-                if '0.0.0.0' in addr:
-                    failed_dhcp = True
-
-            except (su.CalledProcessError, IndexError):
-                failed_dhcp = True
-                addr = 'ERROR, check jail logs'
-
-            if failed_dhcp:
-                iocage_lib.ioc_stop.IOCStop(
-                    self.uuid, self.path, force=True, silent=True
-                )
-
-                iocage_lib.ioc_common.logit({
-                    'level': 'EXCEPTION',
-                    'message': '  + Acquiring DHCP address: FAILED,'
-                    f' address received: {addr}\n'
-                    f'\nStopped {self.uuid} due to DHCP failure'
-                },
-                    _callback=self.callback)
-
-            iocage_lib.ioc_common.logit({
-                'level': 'INFO',
-                'message': f'  + DHCP Address: {addr}'
-            },
-                _callback=self.callback,
-                silent=self.silent)
+            self._check_dhcp_address()
 
         self.set(
             "last_started={}".format(
@@ -1014,6 +964,60 @@ class IOCStart(object):
                     'level': 'ERROR',
                     'message': f'  + Failed to set cpuset to: {cpuset}'
                 })
+
+    def _check_dhcp_address(self):
+        """Read the first IPv4 lease and stop the jail if DHCP failed."""
+        failed_dhcp = False
+
+        try:
+            interface = self.conf['interfaces'].split(',')[0].split(
+                ':')[0]
+
+            if 'vnet' in interface:
+                # Jails default is epairNb
+                interface = f'{interface.replace("vnet", "epair")}b'
+
+            # Override IFCONFIG_FORMAT so addresses remain numeric.
+            cmd = ['jexec', f'ioc-{self.uuid}', 'ifconfig',
+                   '-f', 'addr:numeric,inet:cidr', interface, 'inet']
+            # Interface descriptions need not be UTF-8; only inet fields matter.
+            out = su.check_output(cmd).decode(errors='replace')
+            address = next(
+                (line.split()[1] for line in out.splitlines()
+                 if line.split()[:1] == ['inet']), None
+            )
+            if address is None:
+                raise ValueError('No IPv4 address received')
+            address = ipaddress.IPv4Interface(address)
+            self.ip4_addr = str(address.ip)
+            addr = str(address)
+
+            if address.ip.is_unspecified:
+                failed_dhcp = True
+
+        except (su.CalledProcessError, IndexError, ValueError):
+            failed_dhcp = True
+            addr = 'ERROR, check jail logs'
+
+        if failed_dhcp:
+            iocage_lib.ioc_stop.IOCStop(
+                self.uuid, self.path, force=True, silent=True
+            )
+
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': '  + Acquiring DHCP address: FAILED,'
+                f' address received: {addr}\n'
+                f'\nStopped {self.uuid} due to DHCP failure'
+            },
+                _callback=self.callback)
+
+        iocage_lib.ioc_common.logit({
+            'level': 'INFO',
+            'message': f'  + DHCP Address: {addr}'
+        },
+            _callback=self.callback,
+            silent=self.silent)
 
     def check_aliases(self, ip_addrs, mode='4'):
         """

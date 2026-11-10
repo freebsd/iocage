@@ -7,18 +7,18 @@ Best Practices
 This section provides some generic guidelines and tips for working with
 :command:`iocage` managed jails.
 
-**Use PF as a module**
+**Load PF on the host**
 
-  This is the default setting in the *GENERIC* kernel. There seems to be
-  a VNET bug which is only triggered when PF is directly compiled into
-  the kernel.
+  When using PF with a GENERIC kernel, load the PF module on the host before
+  starting VNET jails that use it. See the :ref:`FAQ` for the required devfs
+  configuration inside the jail.
 
 **Always name jails and templates!**
 
   Use the -n option with :command:`iocage create` to set a name for the
   jail. This helps avoid mistakes and easily identify jails.
 
-  Example: :samp:`iocage create -r 11.0-RELEASE -n testjail`
+  Example: :samp:`iocage create -r 15.1-RELEASE -n testjail`
 
 **Set the notes property**
 
@@ -38,19 +38,21 @@ This section provides some generic guidelines and tips for working with
 **VNET**
 
   *VNET* provides more fine control and isolation for jails. VNET also
-  allows jails to run their own firewalls. See :ref:`Known Issues` for
-  more about VNET.
+  allows jails to run their own firewalls. See :ref:`Networking` for
+  configuration instructions.
 
 **Discover templates!**
 
   Templates simplify using jail creation and customization, give it a
   try! See :ref:`Using Templates` to get started.
 
-**Use** :command:`iocage restart` **instead of start/stop**
+**Choose the appropriate restart**
 
-  Always restart a jail with the :command:`iocage restart -s` command.
-  This performs a soft restart and leaves the *VNET* stack alone, which
-  is less stressful for both kernel and user.
+  Use :command:`iocage restart examplejail` to stop and start the jail.
+  This applies properties that require a jail restart, such as ``cpuset``.
+  Use :command:`iocage restart -s examplejail` to restart the jail's processes
+  while preserving the jail and its network stack. A soft restart does not
+  apply properties that require the jail to be recreated.
 
 **Check the firewall rules**
 

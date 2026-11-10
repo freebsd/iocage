@@ -2,7 +2,7 @@
 
 [![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/freebsd/iocage.svg)](http://isitmaintained.com/project/freebsd/iocage "Average time to resolve an issue")
 [![Percentage of issues still open](http://isitmaintained.com/badge/open/freebsd/iocage.svg)](http://isitmaintained.com/project/freebsd/iocage "Percentage of issues still open")
-![Python Version](https://img.shields.io/badge/Python-3.11-blue.svg)
+[![Python Version](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![GitHub issues](https://img.shields.io/github/issues/freebsd/iocage.svg)](https://github.com/freebsd/iocage/issues)
 [![GitHub forks](https://img.shields.io/github/forks/freebsd/iocage.svg)](https://github.com/freebsd/iocage/network)
 [![GitHub stars](https://img.shields.io/github/stars/freebsd/iocage.svg)](https://github.com/freebsd/iocage/stargazers)
@@ -14,28 +14,31 @@ iocage is a jail/container manager amalgamating some of the best features and
 technologies the FreeBSD operating system has to offer. It is geared for ease
  of use with a simple and easy to understand command syntax.
 
-iocage is in the FreeBSD ports tree as sysutils/py-iocage.
-To install using binary packages, simply run: `pkg install sysutils/iocage`
+iocage is in the FreeBSD ports tree as sysutils/iocage.
+Find the available binary package with `pkg search -x 'py[0-9]+-iocage'`, then install the listed flavor (for example, `pkg install py312-iocage`).
 
 ## Installation
 
 ### GitHub:
 
-The FreeBSD source tree ***must*** be located at `$SRC_BASE` (`/usr/src` by default) to build from git.
+These examples use Python 3.12. Check that your repository provides matching
+module packages with `pkg search -x 'py[0-9]+-(pip|jsonschema)$'`. Use the
+same Python flavor for all package names and commands below.
 
-- `pkg install python3 git-lite lang/cython3 devel/py-pip`
+- `pkg install python312 git py312-pip py312-jsonschema`
 - `git clone https://github.com/freebsd/iocage`
-- `make install` as root
+- `cd iocage`
+- `python3.12 -m pip install -r requirements.txt .` as root
 
-To install subsequent updates: run `make install` as root.
+To install subsequent updates: run `python3.12 -m pip install -r requirements.txt .` as root.
 
 ### Ports:
 
-- Build the port as follows: `cd /usr/ports/sysutils/iocage/ ; make install clean`
+- Build the port as follows: `cd /usr/ports/sysutils/iocage/ ; make BUILD_ALL_PYTHON_FLAVORS=yes FLAVOR=py312 install clean`
 
 ### Pkg:
 
-- It is possible to install pre-built packages using pkg(8) if you are using FreeBSD 10 or above: `pkg install sysutils/iocage`
+- Install the iocage package flavor listed by your configured pkg(8) repository.
 
 #### Upgrading from `iocage_legacy`:
 
@@ -52,23 +55,20 @@ This repository replaces `iocage_legacy`. To upgrade to the current version:
 
 - **[iocage Project Website](https://freebsd.github.io/iocage/)**
 
-## WARNING:
-- Some features of the previous iocage_legacy are either being dropped or simply not ported yet, feel free to open an issue asking about your favorite feature. But please search before opening a new one. PR's welcome for any feature you want!
-
 ## Raising an issue:
 
 We _like_ issues! If you are having trouble with `iocage` please open a GitHub [issue](https://github.com/freebsd/iocage/issues) and we will ~~run around with our hair on fire~~ look into it. Before doing so, please give us some information about the situation:
 
 - Tell us what version of FreeBSD you are using with something like `uname -ro`
 - It would also be helpful if you gave us the output of `iocage --version`
-- Most importantly, try to be detailed. Simply stating "I tried consoling into a jail and it broke" will not help us very much.
+- Most importantly, try to be detailed. Simply stating "I tried opening a console in a jail and it broke" will not help us very much.
 - Use the [Markdown Basics](https://help.github.com/articles/markdown-basics/#code-formatting) GitHub page for more information on how to paste lines of code and terminal output.
 
 ## Submitting a pull request:
 
 Please be detailed on the exact use case of your change and a short demo of
 it. Make sure it conforms with PEP-8 and that you supply a test with it if
-relevant. Lines may not be longer then 80 characters.
+relevant. Lines may not be longer than 80 characters.
 
 ## FEATURES
 
@@ -98,9 +98,9 @@ Fetch a release:
 
 Create a jail:
 
-`iocage create -n myjail ip4_addr="em0|192.168.1.10/24" -r 11.0-RELEASE`
+`iocage create -n myjail ip4_addr="em0|192.168.1.10/24" -r 15.1-RELEASE`
 
-*NOTE: em0 and 11.0-RELEASE are placeholders. Please replace them with your
+*NOTE: em0 and 15.1-RELEASE are placeholders. Please replace them with your
 real interface (`ifconfig`) and RELEASE chosen during `iocage fetch`.*
 
 Start the jail:
@@ -118,9 +118,11 @@ To see a list of commands available to you now, type `iocage` outside the jail.
 
 ### REQUIREMENTS
 
-- FreeBSD 11.4-RELEASE amd64 and higher or HardenedBSD/TrueOS
+- A release supported by the
+  [FreeBSD Security Team](https://www.freebsd.org/security/#sup), or a
+  derivative providing the same jail and ZFS interfaces
 - ZFS file system
-- Python 3.8+
+- Python 3.11.4+
 - UTF-8 locale (place into your ~/.login_conf):
 
 ```plain
@@ -130,13 +132,10 @@ me:\
         :setenv=LC_COLLATE=C:
 ```
 
-### Optional
+### Kernel support
 
-- Kernel compiled with:
-
-        # This is optional and only needed if you need VNET
-
-        options         VIMAGE # VNET/Vimage support
+Supported FreeBSD GENERIC kernels include VNET support (`VIMAGE`). A custom
+kernel must retain `options VIMAGE` to use VNET jails.
 
 ### Helpful Considerations
 

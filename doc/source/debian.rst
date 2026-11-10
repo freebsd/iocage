@@ -1,8 +1,8 @@
 .. index:: Create Debian Jail
 .. _Create a Debian Jail:
 
-Create a Debian Buster Jail (native Linux)
-===========================================
+Create a Debian Jail (native Linux)
+===================================
 
 This section shows the process to set up a Debian Linux jail.
 The examples in this section use a jail with the custom name
@@ -50,8 +50,9 @@ In `/etc/devfs.rules`:
 
 :samp:`# debootstrap bookworm /iocage/jails/debjail/root/`
 
-Apart from Debian releases, like *buster* or *testing*, you can
-also use Ubuntu releases, eg *bionic*.
+The installed debootstrap port determines which Debian and Ubuntu release
+names are available. Select a supported release compatible with FreeBSD's
+Linux compatibility layer.
 
 **Add lines to the jail** :file:`fstab` **file:**
 

@@ -8,7 +8,6 @@ DEPS=\
   py%-click\
   py%-coloredlogs\
   py%-dnspython\
-  py%-fastentrypoints\
   py%-gitpython\
   py%-hatchling\
   py%-jsonschema\

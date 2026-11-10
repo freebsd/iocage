@@ -50,6 +50,55 @@ def test_all_diagnostics_are_retained(package_install, chunks, expected):
     assert expected in str(error.value)
 
 
+@pytest.mark.parametrize('interactive', [False, True])
+@pytest.mark.parametrize('cleanup_exception', [RuntimeError, SystemExit])
+def test_cleanup_failure_preserves_package_diagnostics(
+    package_install, monkeypatch, interactive, cleanup_exception
+):
+    install = package_install
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', interactive)
+    install.outcomes['missing-package'] = [
+        [b'first line\n', b'second line']
+    ] * 3
+    install.outcomes['nano'] = [[b'another failure']] * 3
+    cleanup_error = cleanup_exception(
+        1 if cleanup_exception is SystemExit else 'cleanup failed')
+    install.stop.side_effect = cleanup_error
+
+    with pytest.raises(cleanup_exception) as error:
+        install.create.create_install_packages(
+            'test', '/mock/jails/test', repo='', raise_on_error=True)
+
+    assert error.value is cleanup_error
+    assert install.logs[-1] == {
+        'level': 'ERROR',
+        'message': ('missing-package :first line\nsecond line\n'
+                    'nano :another failure')
+    }
+
+
+@pytest.mark.parametrize('stage', ['bootstrap', 'upgrade'])
+def test_cli_fatal_diagnostic_survives_cleanup_failure(
+    package_install, monkeypatch, caplog, stage
+):
+    install = package_install
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', True)
+    message = f'{stage} failed before package installation'
+    if stage == 'bootstrap':
+        install.bootstrap.return_value = SimpleNamespace(
+            returncode=1, stdout=message.encode())
+    else:
+        install.outcomes['upgrade'] = [[message.encode()]]
+    install.stop.side_effect = RuntimeError('cleanup failed')
+
+    with pytest.raises(RuntimeError, match='cleanup failed'):
+        install.create.create_install_packages(
+            'test', '/mock/jails/test', repo='', raise_on_error=True)
+
+    assert message in caplog.text
+    install.stop.assert_called_once()
+
+
 def test_secure_plugin_bootstrap_keeps_existing_behavior(
     package_install, tmp_path
 ):
@@ -83,9 +132,9 @@ def test_secure_plugin_bootstrap_keeps_existing_behavior(
 
 @pytest.fixture
 def creation(package_install, monkeypatch, tmp_path):
+    """Use real creation control flow with temporary files and mocked ZFS."""
     installer = package_install
     installer.events = []
-    """Use real creation control flow with temporary files and mocked ZFS."""
     create = installer.create
     create.pool = 'test-pool'
     create.iocroot = str(tmp_path)

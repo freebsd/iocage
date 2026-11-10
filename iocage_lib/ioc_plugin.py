@@ -311,7 +311,16 @@ class IOCPlugin(object):
             conf['release'] = re.sub(r"\W\w.", "-", conf['release'])
 
         self.release = conf['release']
-        props, pkg = self.__fetch_plugin_props__(conf, props, num)
+        # Report malformed version data from either the initial read or retry.
+        try:
+            props, pkg = self.__fetch_plugin_props__(conf, props, num)
+        except ValueError as error:
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': str(error)
+            },
+                _callback=self.callback,
+                silent=self.silent)
         self.__fetch_plugin_inform__(conf, num, plugins, accept_license)
         location = f"{self.iocroot}/jails/{self.jail}"
 

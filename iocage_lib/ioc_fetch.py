@@ -984,9 +984,23 @@ class IOCFetch:
 
         finally:
             su.Popen(['umount', f'{mount_root}/dev']).communicate()
-            new_release = iocage_lib.ioc_common.get_jail_freebsd_version(
-                mount_root, self.release
-            )
+            # Clean up the update script even if version detection fails.
+            if self.verify:
+                if not tmp.closed:
+                    tmp.close()
+                os.remove(tmp.name)
+
+            try:
+                new_release = iocage_lib.ioc_common.get_jail_freebsd_version(
+                    mount_root, self.release
+                )
+            except ValueError as error:
+                iocage_lib.ioc_common.logit({
+                    'level': 'EXCEPTION',
+                    'message': str(error)
+                },
+                    _callback=self.callback,
+                    silent=self.silent)
 
             if self.release != new_release:
                 jails = iocage_lib.ioc_list.IOCList(
@@ -1008,14 +1022,6 @@ class IOCFetch:
                         jails[uuid], cli=False
                     )
                     _json.json_set_value(f'release={new_release}')
-
-        if self.verify:
-            # tmp only exists if they verify SSL certs
-
-            if not tmp.closed:
-                tmp.close()
-
-            os.remove(tmp.name)
 
         try:
             if not cli:

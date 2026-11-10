@@ -194,6 +194,13 @@ class IOCUpgrade:
                 self.new_release
             )
 
+        except ValueError as error:
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': str(error)
+            },
+                _callback=self.callback,
+                silent=self.silent)
         finally:
             if tmp:
                 if not tmp.closed:
@@ -229,6 +236,19 @@ class IOCUpgrade:
                     "level": "EXCEPTION",
                     "message": msg
                 },
+                _callback=self.callback,
+                silent=self.silent)
+
+        # Validate the source version before changing the jail or mounting src.
+        try:
+            new_release = iocage_lib.ioc_common.get_jail_freebsd_version(
+                f'{release_p}/root', self.new_release
+            )
+        except ValueError as error:
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': str(error)
+            },
                 _callback=self.callback,
                 silent=self.silent)
 
@@ -312,11 +332,6 @@ class IOCUpgrade:
                 },
                 _callback=self.callback,
                 silent=self.silent)
-
-        new_release = iocage_lib.ioc_common.get_jail_freebsd_version(
-            f'{self.iocroot}/releases/{self.new_release}/root',
-            self.new_release
-        )
 
         iocage_lib.ioc_json.IOCJson(
             f"{self.path.replace('/root', '')}",

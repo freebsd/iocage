@@ -233,14 +233,22 @@ class IOCExec(object):
         # long-lived callers such as middlewared, where the pipe
         # descriptors can be that high. poll() has no such limit.
         poller = select.poll()
+        stdout_fd = self.proc.stdout.fileno()
+        stderr_fd = self.proc.stderr.fileno()
+        open_pipes = {stdout_fd, stderr_fd}
         poller.register(
-            self.proc.stdout.fileno(), select.POLLIN | select.POLLHUP
+            stdout_fd, select.POLLIN | select.POLLHUP
         )
         poller.register(
-            self.proc.stderr.fileno(), select.POLLIN | select.POLLHUP
+            stderr_fd, select.POLLIN | select.POLLHUP
         )
 
         while True:
+            if not open_pipes:
+                # No output remains; wait without spinning or a poll delay.
+                self.proc.wait()
+                break
+
             r = [fd for fd, _ in poller.poll(int(timeout * 1000))]
 
             if self.proc.poll() is not None:
@@ -254,16 +262,28 @@ class IOCExec(object):
                 # repeat.
                 rtrn_stdout = rtrn_stderr = b''
 
-                if self.proc.stdout.fileno() in r:
+                # Drain hangups before unregistering on confirmed EOF.
+                if stdout_fd in r:
                     rtrn_stdout = self.proc.stdout.read()
+                    if rtrn_stdout == b'':
+                        poller.unregister(stdout_fd)
+                        open_pipes.remove(stdout_fd)
+                    rtrn_stdout = rtrn_stdout or b''
 
                     if rtrn_stdout:
                         _rtrn_stdout = rtrn_stdout
-                if self.proc.stderr.fileno() in r:
+                if stderr_fd in r:
                     rtrn_stderr = self.proc.stderr.read()
+                    if rtrn_stderr == b'':
+                        poller.unregister(stderr_fd)
+                        open_pipes.remove(stderr_fd)
+                    rtrn_stderr = rtrn_stderr or b''
                     # EOF reads must not evict useful diagnostics.
                     if rtrn_stderr:
                         stderr_queue.append(rtrn_stderr)
+
+                if not rtrn_stdout and not rtrn_stderr:
+                    continue
 
                 if not self.decode:
                     yield rtrn_stdout, rtrn_stderr

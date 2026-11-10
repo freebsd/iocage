@@ -1,5 +1,6 @@
 import os
 import resource
+import select
 import sys
 
 import pytest
@@ -91,3 +92,116 @@ def test_commands_work_with_high_numbered_pipe_descriptors():
         for descriptor in descriptors:
             os.close(descriptor)
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
+
+
+@pytest.mark.parametrize('closed', [(1,), (2,), (1, 2)])
+@pytest.mark.parametrize('decode', [False, True])
+def test_early_pipe_eof_does_not_spin_or_retain_empty_output(
+    mocker, closed, decode,
+):
+    poller = mocker.Mock(wraps=select.poll())
+    mocker.patch('iocage_lib.ioc_exec.select.poll', return_value=poller)
+    program = (
+        'import os, time\n'
+        'os.write(1, b"stdout before\\n")\n'
+        'os.write(2, b"stderr before\\n")\n'
+        f'for fd in {closed!r}: os.close(fd)\n'
+        'time.sleep(0.05)\n'
+    )
+    if 1 not in closed:
+        program += 'os.write(1, b"stdout after\\n")\n'
+    if 2 not in closed:
+        program += 'os.write(2, b"stderr after\\n")\n'
+
+    result = SilentExec(
+        [sys.executable, '-c', program], None, unjailed=True, decode=decode,
+    )
+
+    stdout = b'stdout before\n'
+    stderr = b'stderr before\n'
+    if 1 not in closed:
+        stdout += b'stdout after\n'
+    if 2 not in closed:
+        stderr += b'stderr after\n'
+    assert result.stdout == (stdout.decode() if decode else stdout)
+    assert result.stderr == (stderr.decode() if decode else stderr)
+    assert all(any(chunk) for chunk in result.output)
+    # A hangup must not produce thousands of immediate wakeups.
+    assert poller.poll.call_count < 10
+
+
+@pytest.mark.parametrize('decode', [False, True])
+def test_hangups_drain_buffered_output(decode):
+    program = (
+        'import os, time\n'
+        'os.write(1, b"o" * 131072)\n'
+        'os.write(2, b"e" * 131072)\n'
+        'os.close(1)\nos.close(2)\n'
+        'time.sleep(0.02)\n'
+    )
+
+    result = SilentExec(
+        [sys.executable, '-c', program], None, unjailed=True, decode=decode,
+    )
+
+    assert result.stdout == ('o' if decode else b'o') * 131072
+    assert result.stderr == ('e' if decode else b'e') * 131072
+
+
+def test_both_pipes_closed_before_failure_preserve_diagnostics():
+    program = (
+        'import os, sys, time\n'
+        'os.write(2, b"Command failed\\n")\n'
+        'os.close(1)\nos.close(2)\n'
+        'time.sleep(0.02)\nsys.exit(1)\n'
+    )
+
+    with pytest.raises(CommandFailed) as raised:
+        SilentExec([sys.executable, '-c', program], None, unjailed=True)
+
+    assert b'Command failed\n' in b''.join(raised.value.message)
+
+
+def test_command_exit_does_not_wait_for_inherited_open_pipes(mocker):
+    proc = mocker.Mock(returncode=0)
+    proc.stdout.fileno.return_value = 3
+    proc.stderr.fileno.return_value = 4
+    proc.poll.return_value = 0
+    mocker.patch('iocage_lib.ioc_exec.su.Popen', return_value=proc)
+    mocker.patch('iocage_lib.ioc_exec.fcntl.fcntl', return_value=0)
+    poller = mocker.Mock()
+    # The child exited, but descendants still hold both output pipes open.
+    poller.poll.side_effect = [
+        [], [], AssertionError('Do not wait for inherited pipes to close'),
+    ]
+    mocker.patch('iocage_lib.ioc_exec.select.poll', return_value=poller)
+
+    result = SilentExec(['command'], None, unjailed=True)
+
+    assert result.stdout == result.stderr == b''
+
+
+@pytest.mark.parametrize('decode', [False, True])
+def test_readiness_without_data_does_not_close_pipe(mocker, decode):
+    proc = mocker.Mock(returncode=0)
+    proc.stdout.fileno.return_value = 3
+    proc.stderr.fileno.return_value = 4
+    proc.stdout.read.side_effect = [None, b'stdout', b'']
+    proc.stderr.read.side_effect = [b'stderr', None, b'']
+    proc.poll.return_value = None
+    mocker.patch('iocage_lib.ioc_exec.su.Popen', return_value=proc)
+    mocker.patch('iocage_lib.ioc_exec.fcntl.fcntl', return_value=0)
+    poller = mocker.Mock()
+    open_pipes = set()
+    poller.register.side_effect = lambda fd, events: open_pipes.add(fd)
+    poller.unregister.side_effect = open_pipes.remove
+    poller.poll.side_effect = lambda timeout: [
+        (fd, select.POLLIN) for fd in open_pipes
+    ]
+    mocker.patch('iocage_lib.ioc_exec.select.poll', return_value=poller)
+
+    result = SilentExec(['command'], None, unjailed=True, decode=decode)
+
+    assert result.stdout == ('stdout' if decode else b'stdout')
+    assert result.stderr == ('stderr' if decode else b'stderr')
+    assert all(any(chunk) for chunk in result.output)

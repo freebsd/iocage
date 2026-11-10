@@ -261,7 +261,9 @@ class IOCExec(object):
                         _rtrn_stdout = rtrn_stdout
                 if self.proc.stderr.fileno() in r:
                     rtrn_stderr = self.proc.stderr.read()
-                    stderr_queue.append(rtrn_stderr)
+                    # EOF reads must not evict useful diagnostics.
+                    if rtrn_stderr:
+                        stderr_queue.append(rtrn_stderr)
 
                 if not self.decode:
                     yield rtrn_stdout, rtrn_stderr

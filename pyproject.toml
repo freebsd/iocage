@@ -29,6 +29,10 @@ dependencies = [
     "coloredlogs>=9.0",
     "requests>=2.18.4",
     "texttable>=1.2.1",
+    "netifaces>=0.10.8",
+    "GitPython>=2.1.11",
+    "dnspython>=2.0.0",
+    "jsonschema>=3.2.0",
 ]
 
 [project.urls]
@@ -54,8 +58,12 @@ exclude = ["*.orig"]
 include = [
     "iocage_cli/*.py",
     "iocage_lib/*.py",
+    "iocage_lib/plugin_manifest.json",
     "pyproject.toml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "rc.d/iocage",
+    "iocage.8",
+    "zsh-completion/_iocage"
 ]
 exclude = ["*.orig"]

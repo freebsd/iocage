@@ -150,12 +150,73 @@ def test_failed_start_does_not_launch_or_restart(console):
     run.assert_not_called()
 
 
-def test_disappearing_jail_is_not_restarted(console):
+def test_disappearing_jail_is_not_restarted(console, caplog):
     jail, _, _, status, start, run, auto_start = console
     run.side_effect = subprocess.CalledProcessError(1, 'jexec')
     with pytest.raises(ioc_exec.iocage_lib.ioc_exceptions.CommandFailed):
         jail.exec(None, console=True)
     status.assert_called_once()
+    assert 'Console failed!' in caplog.text
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+@pytest.mark.parametrize('interactive', [False, True])
+@pytest.mark.parametrize('error', [
+    KeyboardInterrupt(), SystemExit(0), SystemExit(7)
+])
+def test_console_control_exceptions_do_not_log_failure(
+    console, monkeypatch, caplog, interactive, error
+):
+    jail, _, _, _, start, run, auto_start = console
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', interactive)
+    run.side_effect = error
+
+    with pytest.raises(type(error)) as caught:
+        jail.exec(None, console=True)
+
+    assert caught.value is error
+    assert 'Console failed!' not in caplog.text
+    run.assert_called_once()
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+@pytest.mark.parametrize('interactive', [False, True])
+@pytest.mark.parametrize('error', [
+    RuntimeError('console failed'), PermissionError('access denied')
+])
+def test_console_runtime_errors_still_log_failure(
+    console, monkeypatch, caplog, interactive, error
+):
+    jail, _, _, _, start, run, auto_start = console
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', interactive)
+    run.side_effect = error
+
+    with pytest.raises(type(error)) as caught:
+        jail.exec(None, console=True)
+
+    assert caught.value is error
+    assert 'Console failed!' in caplog.text
+    run.assert_called_once()
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+def test_cli_console_command_error_is_not_reported_twice(
+    console, monkeypatch, caplog
+):
+    jail, _, _, _, start, run, auto_start = console
+    # The executor logs this command failure before raising SystemExit.
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', True)
+    run.side_effect = subprocess.CalledProcessError(1, 'jexec')
+
+    with pytest.raises(SystemExit) as caught:
+        jail.exec(None, console=True)
+
+    assert caught.value.code == 1
+    assert caplog.messages == ['Command: login -p -f root failed!']
+    run.assert_called_once()
     start.assert_not_called()
     auto_start.assert_not_called()
 

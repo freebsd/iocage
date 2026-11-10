@@ -990,7 +990,7 @@ class IOCage:
                 console_cmd, path, uuid=uuid,
                 jail_config=conf, jail_status=(status, jid)
             )
-        except BaseException:
+        except Exception:
             ioc_common.logit(
                 {
                     'level': 'ERROR',

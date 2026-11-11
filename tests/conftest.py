@@ -286,6 +286,27 @@ def invoke_cli():
 
 
 @pytest.fixture
+def fetch_options(
+    server, user, password, auth, root_dir, http, _file, noupdate
+):
+    """Share download settings between initial and upgrade-source fetches."""
+    options = []
+    for option, value in (
+        ('--server', server), ('--user', user), ('--password', password),
+        ('--auth', auth), ('--root-dir', root_dir),
+    ):
+        if value:
+            options.extend([option, value])
+    if http:
+        options.append('--http')
+    if _file:
+        options.append('--file')
+    if noupdate:
+        options.append('--noupdate')
+    return options
+
+
+@pytest.fixture
 def write_file():
     def write_to_file(location, data):
         with iocage_lib.ioc_common.open_atomic(location, 'w') as f:

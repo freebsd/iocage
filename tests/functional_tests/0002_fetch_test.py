@@ -30,20 +30,5 @@ require_zpool = pytest.mark.require_zpool
 
 @require_root
 @require_zpool
-def test_fetch(
-    release, server, user, password, auth,
-    root_dir, http, _file, noupdate, invoke_cli
-):
-    command = ['fetch', '-r', release]
-    command += ['-s', server] if server else []
-    command += ['-h'] if http else []
-    command += ['-f', _file] if _file else []
-    command += ['-u', user] if user else []
-    command += ['-p', password] if password else []
-    command += ['-a', auth] if auth else []
-    command += ['-d', root_dir] if root_dir else []
-    command += ['-NU'] if noupdate else []
-
-    invoke_cli(
-        command
-    )
+def test_fetch(release, fetch_options, invoke_cli):
+    invoke_cli(['fetch', '-r', release, *fetch_options])

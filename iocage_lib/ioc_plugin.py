@@ -59,9 +59,6 @@ from iocage_lib.dataset import Dataset
 GIT_LOCK = threading.Lock()
 RE_PLUGIN_VERSION = re.compile(r'"path":"([/\.\+,\d\w-]*)\.txz"')
 
-# deliberately crash if tarfile doesn't have required filter
-tarfile.tar_filter
-
 
 class IOCPlugin(object):
 
@@ -98,7 +95,7 @@ class IOCPlugin(object):
         self.jail = jail
         self.http = kwargs.pop("http", True)
         self.hardened = kwargs.pop("hardened", False)
-        self.date = datetime.datetime.utcnow().strftime("%F")
+        self.date = datetime.datetime.now(datetime.UTC).strftime("%F")
         self.branch = branch
         self.silent = silent
         self.callback = callback

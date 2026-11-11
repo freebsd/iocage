@@ -168,7 +168,7 @@ class IOCLogger(object):
 cmd_folder = os.path.abspath(os.path.dirname(__file__))
 
 
-class IOCageCLI(click.MultiCommand):
+class IOCageCLI(click.Group):
 
     """
     Iterates in the 'cli' directory and will load any module's cli definition.

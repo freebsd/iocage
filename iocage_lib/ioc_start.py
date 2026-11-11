@@ -961,7 +961,7 @@ class IOCStart(object):
 
         self.set(
             "last_started={}".format(
-                datetime.datetime.utcnow().strftime("%F %T")
+                datetime.datetime.now(datetime.UTC).strftime("%F %T")
             )
         )
 

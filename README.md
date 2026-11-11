@@ -120,7 +120,7 @@ To see a list of commands available to you now, type `iocage` outside the jail.
 
 - FreeBSD 11.4-RELEASE amd64 and higher or HardenedBSD/TrueOS
 - ZFS file system
-- Python 3.8+
+- Python 3.11.4+
 - UTF-8 locale (place into your ~/.login_conf):
 
 ```plain

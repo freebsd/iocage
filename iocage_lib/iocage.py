@@ -1737,7 +1737,7 @@ class IOCage:
     def snapshot_all(self, name):
         # We want a consistent name across a snapshot batch.
         if not name:
-            name = datetime.datetime.utcnow().strftime("%F_%T")
+            name = datetime.datetime.now(datetime.UTC).strftime("%F_%T")
         self._all = False
         for jail in self.jails:
             self.jail = jail
@@ -1748,7 +1748,7 @@ class IOCage:
         if self._all:
             self.snapshot_all(name)
             return
-        date = datetime.datetime.utcnow().strftime("%F_%T")
+        date = datetime.datetime.now(datetime.UTC).strftime("%F_%T")
         uuid, path = self.__check_jail_existence__()
 
         # If they don't supply a snapshot name, we will use the date.
@@ -1817,7 +1817,8 @@ class IOCage:
             ] + exec_start
             su.Popen(start_cmd, stdout=su.PIPE, stderr=su.PIPE).communicate()
             ioc_json.IOCJson(path, silent=True).json_set_value(
-                f"last_started={datetime.datetime.utcnow().strftime('%F %T')}")
+                f"last_started="
+                f"{datetime.datetime.now(datetime.UTC).strftime('%F %T')}")
         else:
             ioc_common.logit(
                 {
@@ -2173,7 +2174,7 @@ class IOCage:
             self.silent = _silent
 
         if basejail:
-            _date = datetime.datetime.utcnow().strftime("%F")
+            _date = datetime.datetime.now(datetime.UTC).strftime("%F")
             msg = f"""\
 \n{uuid} successfully upgraded from {jail_release} to {new_release}!
 Please reboot the jail and inspect.

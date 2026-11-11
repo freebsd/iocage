@@ -764,7 +764,7 @@ class IOCCreate(object):
             import dns.resolver
             import dns.exception
             try:
-                dns.resolver.query(repo)
+                dns.resolver.resolve(repo, search=True)
             except dns.resolver.NoNameservers:
                 iocage_lib.ioc_common.logit({
                     'level': 'EXCEPTION',

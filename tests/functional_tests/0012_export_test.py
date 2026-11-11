@@ -48,7 +48,8 @@ def test_01_export_jail(invoke_cli, resource_selector, skip_test):
     assert os.path.isdir(jail.zfs.images_dataset_path) is True, \
         f'{jail.zfs.images_dataset_path} does not exist'
 
-    filename = f'{jail.name}_{datetime.datetime.utcnow().strftime("%F")}.zip'
+    date = datetime.datetime.now(datetime.UTC).strftime("%F")
+    filename = f'{jail.name}_{date}.zip'
     list_dir = os.listdir(jail.zfs.images_dataset_path)
 
     assert filename in list_dir, f'{filename} does not exist'

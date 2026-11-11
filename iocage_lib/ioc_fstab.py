@@ -380,7 +380,7 @@ class IOCFstab(object):
             for line in self.fstab:
                 fstab.write(f'{line}\n')
 
-            date = datetime.datetime.utcnow().strftime("%F %T")
+            date = datetime.datetime.now(datetime.UTC).strftime("%F %T")
             fstab.write(f'{self.mount} # Added by iocage on {date}\n')
 
         iocage_lib.ioc_common.logit({
@@ -488,7 +488,9 @@ class IOCFstab(object):
 
                 for i, line in enumerate(self.fstab):
                     if i == self.index:
-                        date = datetime.datetime.utcnow().strftime("%F %T")
+                        date = datetime.datetime.now(datetime.UTC).strftime(
+                            "%F %T"
+                        )
                         fstab.write(
                             f"{self.mount} # Added by iocage on {date}\n")
                         matched = True

@@ -44,6 +44,11 @@ Documentation:
    known-issues
    faq
 
+.. toctree::
+   :hidden:
+
+   modules
+
 .. Missing File: automatic-package-installation
 
 Indices and tables

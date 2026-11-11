@@ -319,6 +319,7 @@ class IOCFetch:
         Fetch a user specified RELEASE from FreeBSD's http server or a user
         supplied one. The user can also specify the user, password and
         root-directory containing the release tree that looks like so:
+
             - XX.X-RELEASE
             - XX.X-RELEASE
             - XX.X-RELEASE

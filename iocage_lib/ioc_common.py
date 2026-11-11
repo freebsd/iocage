@@ -577,9 +577,9 @@ def open_atomic(filepath, *args, **kwargs):
         the file path to be opened
     fsync : bool
         whether to force write the file to disk
-    *args : mixed
+    ``*args`` : mixed
         Any valid arguments for :code:`open`
-    **kwargs : mixed
+    ``**kwargs`` : mixed
         Any valid keyword arguments for :code:`open`
     """
     fsync = kwargs.get('fsync', False)

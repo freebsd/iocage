@@ -58,7 +58,8 @@ from iocage_lib.snapshot import SnapshotListableResource, Snapshot
 # its consumers can be removed, but places using the workaround
 # need to be changed to use flag_value=False instead of
 # is_flag=True (and change default to True).
-CLICK_WORKAROUND=True
+CLICK_WORKAROUND = True
+
 
 class PoolAndDataset:
 

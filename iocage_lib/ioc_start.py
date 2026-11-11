@@ -1410,7 +1410,7 @@ class IOCStart(object):
         m.update(nic.encode("utf-8"))
         prefix = self.get("mac_prefix")
 
-        return f"{prefix}{m.hexdigest()[0:12-len(prefix)]}"
+        return f"{prefix}{m.hexdigest()[0:12 - len(prefix)]}"
 
     def __generate_mac_address_pair(self, nic):
         mac_a = self.__generate_mac_bytes(nic)

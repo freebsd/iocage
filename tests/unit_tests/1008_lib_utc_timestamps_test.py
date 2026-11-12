@@ -8,6 +8,7 @@ import pytest
 from iocage_lib import ioc_image, iocage
 
 
+# Local dates differ from UTC around these instants, exposing local-time use.
 @pytest.mark.parametrize('zone', [
     'Pacific/Kiritimati', 'America/Los_Angeles'
 ])
@@ -42,6 +43,7 @@ def test_snapshot_names_and_image_dates_stay_in_utc(monkeypatch, zone, stamp):
                 jail.snapshot_all(None)
                 image = ioc_image.IOCImage()
     finally:
+        # monkeypatch restored TZ; refresh libc's cached timezone as well.
         time.tzset()
 
     expected = instant.strftime('%F_%T')

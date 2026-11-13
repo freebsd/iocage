@@ -118,7 +118,9 @@ To see a list of commands available to you now, type `iocage` outside the jail.
 
 ### REQUIREMENTS
 
-- FreeBSD 11.4-RELEASE amd64 and higher or HardenedBSD/TrueOS
+- A release supported by the
+  [FreeBSD Security Team](https://www.freebsd.org/security/#sup), or a
+  derivative providing the same jail and ZFS interfaces
 - ZFS file system
 - Python 3.8+
 - UTF-8 locale (place into your ~/.login_conf):

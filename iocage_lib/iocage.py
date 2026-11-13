@@ -561,14 +561,6 @@ class IOCage:
             else:
                 files = ['MANIFEST', 'base.txz', 'lib32.txz', 'src.txz']
 
-            try:
-                if int(release.rsplit('-')[0].rsplit('.')[0]) < 12:
-                    # doc.txz has relevance here still
-                    files.append('doc.txz')
-            except (AttributeError, ValueError):
-                # Non-standard naming scheme, assuming it's current
-                pass
-
             ioc_fetch.IOCFetch(
                 release,
                 hardened=hardened,
@@ -1029,14 +1021,6 @@ class IOCage:
                     kwargs['files'] = ['MANIFEST', 'base.txz', 'lib32.txz',
                                        'src.txz']
 
-                    try:
-                        if int(release.rsplit('-')[0].rsplit('.')[0]) < 12:
-                            # doc.txz has relevance here still
-                            kwargs['files'].append('doc.txz')
-                    except (AttributeError, ValueError):
-                        # Non-standard naming scheme, assuming it's current
-                        pass
-
             if "HBSD" in freebsd_version:
                 if kwargs["server"] == "download.freebsd.org":
                     kwargs["hardened"] = True
@@ -1145,21 +1129,8 @@ class IOCage:
         """Adds an fstab entry for a jail"""
         uuid, path = self.__check_jail_existence__()
 
-        if action != "list":
-            if add_path:
-                destination = f"{self.iocroot}/jails/{uuid}/root{destination}"
-
-            if destination and len(destination) > 88:
-                ioc_common.logit(
-                    {
-                        "level":
-                        "WARNING",
-                        "message":
-                        "The destination's mountpoint exceeds 88 "
-                        "characters, this may cause failure!"
-                    },
-                    _callback=self.callback,
-                    silent=self.silent)
+        if action != "list" and add_path:
+            destination = f"{self.iocroot}/jails/{uuid}/root{destination}"
 
         if action == "list":
             fstab = ioc_fstab.IOCFstab(

@@ -43,15 +43,13 @@ iocage currently has four environment variables:
    +------------------+-----------------+----------------------------------------------------+
 
 The process for setting these variables depends on the shell being used.
-The default FreeBSD shell :command:`csh/tcsh` and the :command:`bash/sh`
-shell are different from one another and require a slightly different
-process for setting environment variables. For example:
+Use the syntax for your current shell:
 
-In the FreeBSD shell :command:`csh/tcsh` , :samp:`setenv IOCAGE_COLOR TRUE`
-sets the environment variable IOCAGE_COLOR to true.
+In :command:`sh` or :command:`bash`, :samp:`export IOCAGE_COLOR=TRUE`
+enables colored output.
 
-In the :command:`bash/sh` shell, :samp:`export IOCAGE_COLOR=TRUE` sets
-the environment variable IOCAGE_COLOR to true.
+In :command:`csh` or :command:`tcsh`, :samp:`setenv IOCAGE_COLOR TRUE`
+enables colored output.
 
 .. index:: Activate iocage
 .. _Activate iocage:
@@ -81,15 +79,13 @@ user to choose which release to download, as seen in this example:
 .. code-block:: none
 
  # iocage fetch
- [0] 9.3-RELEASE (EOL)
- [1] 10.1-RELEASE (EOL)
- [2] 10.2-RELEASE (EOL)
- [3] 10.3-RELEASE
- [4] 11.0-RELEASE
+ [0] 14.4-RELEASE
+ [1] 14.5-RELEASE
+ [2] 15.1-RELEASE
 
  Type the number of the desired RELEASE
- Press [Enter] to fetch the default selection: (11.0-RELEASE)
- Type EXIT to quit: 4
+ Press [Enter] to fetch the default selection: (15.1-RELEASE)
+ Type EXIT to quit: 2
 
 Once the desired RELEASE is downloaded, the most recent patches are also
 applied to it.
@@ -103,7 +99,7 @@ To fetch the latest RELEASE,
 
 If a specific RELEASE is required, use the **-r** option:
 
-:command:`iocage fetch -r [11.0-RELEASE]`
+:command:`iocage fetch -r [15.1-RELEASE]`
 
 
 If a specific download mirror is required, use the **-s** option:
@@ -140,15 +136,15 @@ release:
 
 This creates a normal jail that is a clone of the latest release.
 
-Here is an example of creating a normal jail from the *11.0-RELEASE*:
+Here is an example of creating a normal jail from the *15.1-RELEASE*:
 
-:samp:`# iocage create -r 11.0-RELEASE`
+:samp:`# iocage create -r 15.1-RELEASE`
 
 This normal jail is a clone of the specified RELEASE.
 
 To create multiple jails, use the **-c** option:
 
-:samp:`# iocage create -r 11.0-RELEASE -c 2`
+:samp:`# iocage create -r 15.1-RELEASE -c 2`
 
 This example shows the numeric value after the **-c** flag is used to
 designate the number of jails to create. In the above example, two jails
@@ -161,9 +157,9 @@ A simple basejail is created with the **-b** option:
 After designating the type and number of jails to create with the option
 flags, specific jail **properties** can also be set. For example:
 
-:samp:`# iocage create -r 11.0-RELEASE --name myjail boot=on`
+:samp:`# iocage create -r 15.1-RELEASE --name myjail boot=on`
 
-Creates a FreeBSD 11.0-RELEASE jail with the custom name *myjail* and
+Creates a FreeBSD 15.1-RELEASE jail with the custom name *myjail* and
 sets the jail to start at system boot time.
 
 More information about jail properties is available in the iocage(8)
@@ -222,7 +218,7 @@ usable when doing :command:`iocage` operations like starting a jail:
 
 Partial entries are also acceptable:
 
-:samp:`# iocaget start www`
+:samp:`# iocage start www`
 
 :samp:`# iocage start 26e8`
 

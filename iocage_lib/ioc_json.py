@@ -1001,12 +1001,7 @@ class IOCConfiguration:
                 }
             )
 
-        if release[:4].endswith('-'):
-            # 9.3-RELEASE and under don't actually have this binary.
-            release = conf['release']
-        elif release == 'EMPTY':
-            pass
-        else:
+        if release != 'EMPTY':
             try:
                 release = iocage_lib.ioc_common.get_jail_freebsd_version(
                     freebsd_version_path, release

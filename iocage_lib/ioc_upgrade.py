@@ -67,7 +67,7 @@ class IOCUpgrade:
             self.uuid)
         self._freebsd_version = f"{self.iocroot}/jails/" \
             f"{self.uuid}/root/bin/freebsd-version"
-        self.date = datetime.datetime.utcnow().strftime("%F")
+        self.date = datetime.datetime.now(datetime.UTC).strftime("%F")
         self.interactive = interactive
         self.silent = silent
 

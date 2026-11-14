@@ -97,7 +97,7 @@ class IOCPlugin(object):
         self.jail = jail
         self.http = kwargs.pop("http", True)
         self.hardened = kwargs.pop("hardened", False)
-        self.date = datetime.datetime.utcnow().strftime("%F")
+        self.date = datetime.datetime.now(datetime.UTC).strftime("%F")
         self.branch = branch
         self.silent = silent
         self.callback = callback

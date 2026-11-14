@@ -104,13 +104,17 @@ class IOCStart(object):
 
         if status:
             msg = f"{self.uuid} is already running!"
-            iocage_lib.ioc_common.logit({
-                "level": "EXCEPTION",
-                "message": msg,
-                "force_raise": self.is_depend
-            }, _callback=self.callback,
-                silent=self.silent,
-                exception=ioc_exceptions.JailRunning)
+            try:
+                iocage_lib.ioc_common.logit({
+                    "level": "EXCEPTION",
+                    "message": msg,
+                    "force_raise": self.is_depend
+                }, _callback=self.callback,
+                    silent=self.silent,
+                    exception=ioc_exceptions.JailRunning)
+            except SystemExit as error:
+                # Keep the reason available to callers in CLI mode too.
+                raise error from ioc_exceptions.JailRunning(msg)
 
         if self.conf['hostid_strict_check']:
             with open("/etc/hostid", "r") as _file:
@@ -183,9 +187,7 @@ class IOCStart(object):
         self.host_gateways = iocage_lib.ioc_common.get_host_gateways(self.exec_fib)
 
         fstab_list = []
-        with open(
-                f'{self.iocroot}/jails/{self.jail_uuid}/fstab', 'r'
-        ) as _fstab:
+        with open(f'{self.path}/fstab', 'r') as _fstab:
             for line in _fstab.readlines():
                 line = line.rsplit("#")[0].rstrip()
                 fstab_list.append(line)

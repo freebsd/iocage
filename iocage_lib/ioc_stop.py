@@ -246,7 +246,7 @@ class IOCStop(object):
             for nic in self.conf["vnet_interfaces"].split(","):
                 try:
                     iocage_lib.ioc_common.checkoutput(
-                        ["ifconfig",f"{nic}", "-vnet", f"ioc-{self.uuid}"],
+                        ["ifconfig", f"{nic}", "-vnet", f"ioc-{self.uuid}"],
                         stderr=su.STDOUT)
                 except su.CalledProcessError as err:
                     vnet_err.append(err.output.decode().rstrip())

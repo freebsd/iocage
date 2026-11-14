@@ -48,6 +48,8 @@ from iocage_lib.dataset import Dataset
 # basically the same, but **without**:
 # - Clear high mode bits (setuid, setgid, sticky) and
 #   group/other write bits (S_IWGRP | S_IWOTH).
+
+
 def untar_release_filter(member, dest_path):
     new_attrs = {}
     name = member.name
@@ -67,6 +69,7 @@ def untar_release_filter(member, dest_path):
     if new_attrs:
         return member.replace(**new_attrs, deep=False)
     return member
+
 
 class IOCFetch:
 

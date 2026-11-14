@@ -23,6 +23,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """The main CLI for ioc."""
 
+import io
 import locale
 import logging
 import logging.config
@@ -36,8 +37,6 @@ import sys
 import click
 import coloredlogs
 import iocage_lib.ioc_check as ioc_check
-# This prevents it from getting in our way.
-from click import core
 from iocage_lib.ioc_common import set_interactive
 
 import importlib.metadata
@@ -47,27 +46,31 @@ try:
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0"  # Fallback for development mode
 
-core._verify_python3_env = lambda: None
-locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
-sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
-sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf8', buffering=1)
-set_interactive(True)
+def _configure_runtime():
+    """Initialize the CLI when invoked, leaving imports safe for callers."""
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+    for stream in (sys.stdout, sys.stderr):
+        # Captured streams may have no file descriptor or reconfigure method.
+        reconfigure = getattr(stream, 'reconfigure', None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding='utf8', line_buffering=True)
+            except io.UnsupportedOperation:
+                # Caller-managed streams may have already been read from.
+                pass
+    set_interactive(True)
 
-# @formatter:off
-# Sometimes SIGINT won't be installed.
-# http://stackoverflow.com/questions/40775054/capturing-sigint-using-keyboardinterrupt-exception-works-in-terminal-not-in-scr/40785230#40785230
-signal.signal(signal.SIGINT, signal.default_int_handler)
-# If a utility decides to cut off the pipe, we don't care (IE: head)
-signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-# @formatter:on
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    # Exit quietly when the output pipe is closed, for example by head.
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
-try:
-    su.check_call(
-        ["sysctl", "vfs.zfs.version.spa"], stdout=su.PIPE, stderr=su.PIPE)
-except su.CalledProcessError:
-    sys.exit("ZFS is required to use iocage.\n"
-             "Try calling 'kldload zfs' as root.")
+    try:
+        su.check_call(
+            ["sysctl", "vfs.zfs.version.spa"], stdout=su.PIPE, stderr=su.PIPE)
+    except su.CalledProcessError:
+        sys.exit("ZFS is required to use iocage.\n"
+                 "Try calling 'kldload zfs' as root.")
 
 
 def print_version(ctx, param, value):
@@ -76,7 +79,7 @@ def print_version(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
     print("Version\t" + __version__)
-    sys.exit()
+    ctx.exit(0)
 
 
 class InfoHandler(logging.Handler):
@@ -173,6 +176,11 @@ class IOCageCLI(click.MultiCommand):
     """
     Iterates in the 'cli' directory and will load any module's cli definition.
     """
+
+    def main(self, *args, **kwargs):
+        # Run before Click's eager help/version callbacks, as at startup.
+        _configure_runtime()
+        return super().main(*args, **kwargs)
 
     def list_commands(self, ctx):
         rv = []

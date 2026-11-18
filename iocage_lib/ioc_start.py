@@ -23,12 +23,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """This is responsible for starting jails."""
 import datetime
+import errno
 import hashlib
 import os
+import stat
 import re
 import fcntl
 import itertools
-import shutil
 import json
 import subprocess as su
 import netifaces
@@ -423,17 +424,28 @@ class IOCStart(object):
                     localhost_ip = iocage_lib.ioc_common.gen_unused_lo_ip()
                     self.set(f'localhost_ip={localhost_ip}')
 
-                with open(
-                        f'{self.path}/root/etc/hosts', 'r'
-                ) as _etc_hosts:
-                    with iocage_lib.ioc_common.open_atomic(
-                            f'{self.path}/root/etc/hosts', 'w') as etc_hosts:
-                        # open_atomic will empty the file, we need these still.
-                        for line in _etc_hosts.readlines():
-                            if line.startswith('127.0.0.1'):
-                                line = line.replace('127.0.0.1', localhost_ip)
+                # read and replace the jail's hosts
+                # without following a link inside the jail.
+                hosts = self.__jail_etc__(
+                    iocage_lib.ioc_common.read_jail_etc_file, 'hosts'
+                )
+                if hosts is None:
+                    iocage_lib.ioc_common.logit({
+                        'level': 'WARNING',
+                        'message': f'{self.uuid}: etc/hosts not updated:'
+                                   ' it is not a plain file'
+                    }, _callback=self.callback, silent=self.silent)
+                else:
+                    lines = []
+                    for line in hosts.splitlines(keepends=True):
+                        if line.startswith('127.0.0.1'):
+                            line = line.replace('127.0.0.1', localhost_ip)
 
-                            etc_hosts.write(line)
+                        lines.append(line)
+                    self.__jail_etc__(
+                        iocage_lib.ioc_common.write_jail_etc_file, 'hosts',
+                        data=''.join(lines).encode(), mode=0o644
+                    )
 
                 if self.check_aliases(localhost_ip, '4') != localhost_ip:
                     su.run(['ifconfig', 'lo0', 'alias', f'{localhost_ip}/32'])
@@ -1370,39 +1382,83 @@ class IOCStart(object):
 
     def start_copy_localtime(self):
         host_time = self.get("host_time")
-        file = f"{self.path}/root/etc/localtime"
 
         if not iocage_lib.ioc_common.check_truthy(host_time):
             return
 
-        if os.path.isfile(file):
-            os.remove(file)
-
+        # the host's /etc/localtime (a link stays a
+        # link, as shutil.copy(follow_symlinks=False) made it) replaces the
+        # jail's without following a link inside the jail.
         try:
-            shutil.copy("/etc/localtime", file, follow_symlinks=False)
+            if os.path.islink('/etc/localtime'):
+                content = {'link': os.readlink('/etc/localtime')}
+            else:
+                with open('/etc/localtime', 'rb') as f:
+                    content = {
+                        'data': f.read(),
+                        'mode': stat.S_IMODE(os.fstat(f.fileno()).st_mode)
+                    }
         except FileNotFoundError:
             return
+
+        self.__jail_etc__(
+            iocage_lib.ioc_common.write_jail_etc_file, 'localtime', **content
+        )
 
     def start_generate_resolv(self):
         resolver = self.get("resolver")
         #                                     compat
 
+        # the jail's resolv.conf is replaced without
+        # following a link inside the jail. Contents and modes are as before:
+        # a custom resolver is written 0644 (open_atomic's mode), a copied
+        # file keeps its source's mode (shutil.copy's).
         if resolver != "/etc/resolv.conf" and resolver != "none" and \
                 resolver != "/dev/null":
-            with iocage_lib.ioc_common.open_atomic(
-                    f"{self.path}/root/etc/resolv.conf", "w") as resolv_conf:
-
-                for line in resolver.split(";"):
-                    resolv_conf.write(line + "\n")
-        elif resolver == "none":
-            shutil.copy("/etc/resolv.conf",
-                        f"{self.path}/root/etc/resolv.conf")
+            content = {
+                'data': ''.join(
+                    f'{line}\n' for line in resolver.split(";")
+                ).encode(),
+                'mode': 0o644
+            }
         elif resolver == "/dev/null":
             # They don't want the resolv.conf to be touched.
 
             return
         else:
-            shutil.copy(resolver, f"{self.path}/root/etc/resolv.conf")
+            source = "/etc/resolv.conf" if resolver == "none" else resolver
+            with open(source, 'rb') as f:
+                content = {
+                    'data': f.read(),
+                    'mode': stat.S_IMODE(os.fstat(f.fileno()).st_mode)
+                }
+
+        self.__jail_etc__(
+            iocage_lib.ioc_common.write_jail_etc_file, 'resolv.conf',
+            **content
+        )
+
+    def __jail_etc__(self, operation, name, **kwargs):
+        """
+        Run a read_/write_jail_etc_file operation on this jail's etc/<name>.
+        When the jail's root or etc is not a plain directory (a link, say),
+        the step is skipped with a warning and the start goes on;
+        None is returned then.
+        """
+        try:
+            return operation(f'{self.path}/root', name, **kwargs)
+        except OSError as e:
+            if e.errno not in (
+                errno.ENOTDIR, errno.ENOENT, errno.EMLINK, errno.ELOOP
+            ):
+                raise
+            iocage_lib.ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'{self.uuid}: etc/{name} not updated: the'
+                           f' jail\'s root/etc is not a plain directory'
+                           f' ({e.strerror})'
+            }, _callback=self.callback, silent=self.silent)
+            return None
 
     def __generate_mac_bytes(self, nic):
         m = hashlib.md5()

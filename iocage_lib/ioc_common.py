@@ -24,6 +24,7 @@
 """Common methods we reuse."""
 import collections
 import contextlib
+import errno
 import ipaddress
 import logging
 import os
@@ -592,6 +593,84 @@ def open_atomic(filepath, *args, **kwargs):
                     os.fsync(file.fileno())
         os.rename(tmppath, filepath)
         os.chmod(filepath, 0o644)
+
+
+def _jail_etc_fd(jail_root):
+    dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    root_fd = os.open(jail_root, dflags)
+    try:
+        return os.open('etc', dflags, dir_fd=root_fd)
+    finally:
+        os.close(root_fd)
+
+
+def read_jail_etc_file(jail_root, name):
+    """
+    The text of `<jail_root>/etc/<name>`, or None when it is absent or not
+    a regular file. No link inside the jail is followed:
+    `etc` that is not a directory raises OSError.
+    """
+    etc_fd = _jail_etc_fd(jail_root)
+    try:
+        try:
+            fd = os.open(
+                name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK |
+                os.O_CLOEXEC, dir_fd=etc_fd
+            )
+        except OSError as e:
+            if e.errno in (errno.EMLINK, errno.ELOOP, errno.ENOENT):
+                return None
+            raise
+        with os.fdopen(fd, 'r') as f:
+            if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+                return None
+            return f.read()
+    finally:
+        os.close(etc_fd)
+
+
+def write_jail_etc_file(jail_root, name, data=None, link=None, mode=0o644):
+    """
+    Replace `<jail_root>/etc/<name>` with `data` (bytes, given `mode`) or
+    with a symlink to `link`, without ever writing through a link found in
+    the jail.
+
+    `etc` is opened with O_NOFOLLOW; the new file is created next to the old
+    one under a temporary name (O_EXCL | O_NOFOLLOW) and renamed over it, so
+    whatever was there -- a file, a link, a FIFO -- is replaced, never
+    written into. `etc` that is not a directory raises OSError.
+    """
+    etc_fd = _jail_etc_fd(jail_root)
+    tmp_name = f'.{name}.iocage-{os.getpid()}'
+    try:
+        try:
+            os.unlink(tmp_name, dir_fd=etc_fd)
+        except FileNotFoundError:
+            pass
+        try:
+            if link is not None:
+                os.symlink(link, tmp_name, dir_fd=etc_fd)
+            else:
+                fd = os.open(
+                    tmp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                    os.O_NOFOLLOW | os.O_CLOEXEC, mode, dir_fd=etc_fd
+                )
+                try:
+                    view = memoryview(data)
+                    while view:
+                        view = view[os.write(fd, view):]
+                    os.fchmod(fd, mode)
+                finally:
+                    os.close(fd)
+            os.rename(tmp_name, name, src_dir_fd=etc_fd, dst_dir_fd=etc_fd)
+        except BaseException:
+            try:
+                os.unlink(tmp_name, dir_fd=etc_fd)
+            except OSError:
+                pass
+            raise
+    finally:
+        os.close(etc_fd)
 
 
 def get_nested_key(_dict, keys=None):

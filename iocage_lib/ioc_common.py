@@ -604,11 +604,11 @@ def _jail_etc_fd(jail_root):
         os.close(root_fd)
 
 
-def read_jail_etc_file(jail_root, name):
+def read_jail_etc_file(jail_root, name, binary=False):
     """
-    The text of `<jail_root>/etc/<name>`, or None when it is absent or not
-    a regular file. No link inside the jail is followed:
-    `etc` that is not a directory raises OSError.
+    The text of `<jail_root>/etc/<name>` (its bytes with `binary`), or None
+    when it is absent or not a regular file. No link inside the jail is
+    followed: `etc` that is not a directory raises OSError.
     """
     etc_fd = _jail_etc_fd(jail_root)
     try:
@@ -621,7 +621,7 @@ def read_jail_etc_file(jail_root, name):
             if e.errno in (errno.EMLINK, errno.ELOOP, errno.ENOENT):
                 return None
             raise
-        with os.fdopen(fd, 'r') as f:
+        with os.fdopen(fd, 'rb' if binary else 'r') as f:
             if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
                 return None
             return f.read()
@@ -673,6 +673,107 @@ def write_jail_etc_file(jail_root, name, data=None, link=None, mode=0o644):
         os.close(etc_fd)
 
 
+def _rc_conf_assignment(line):
+    """
+    (name, value) when an rc.conf line (bytes) assigns a variable the way
+    iocage has always read these files: not a comment, the name before the
+    first `=`, the value after it without quote characters. None otherwise.
+    The line is only split, never evaluated.
+    """
+    stripped = line.strip()
+    if stripped.startswith(b'#') or b'=' not in stripped:
+        return None
+    name, value = stripped.split(b'=', 1)
+    return name.strip(), value.strip().replace(b"'", b'').replace(b'"', b'')
+
+
+def edit_jail_rc_conf(jail_root, name='rc.conf', set_values=None,
+                      remove_if=None, create=True):
+    """
+    Edit `<jail_root>/etc/<name>`, an rc.conf of the jail, from the host.
+
+    `set_values` maps a variable to the value it gets. `remove_if` maps a
+    variable to a value: the variable is removed when that is what it is
+    set to. The result is 'written', 'unchanged', or 'not-a-file' when
+    something other than a plain file is there (a link, a FIFO, a
+    directory), which is left alone.
+
+    The file belongs to root in the jail, so it is handled as text and
+    never as shell. `sysrc -f` sources the file it is given, which ran the
+    jail's rc.conf as root on the host at every start, and both sysrc and
+    an open() by path write through a link left in the file's place.
+    Here it is read and replaced with
+    read_/write_jail_etc_file; lines that are not touched keep their bytes.
+
+    An absent file is created when `create` is true and is a
+    FileNotFoundError otherwise. `etc` that is not a directory raises
+    OSError, as in the helpers.
+    """
+    etc_fd = _jail_etc_fd(jail_root)
+    try:
+        try:
+            st = os.stat(name, dir_fd=etc_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            st = None
+    finally:
+        os.close(etc_fd)
+
+    if st is None:
+        if not create:
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT),
+                os.path.join(jail_root, 'etc', name)
+            )
+        data, mode = b'', 0o644
+    elif not stat.S_ISREG(st.st_mode):
+        return 'not-a-file'
+    else:
+        data = read_jail_etc_file(jail_root, name, binary=True)
+        if data is None:
+            # Something else took its place since the stat.
+            return 'not-a-file'
+        mode = stat.S_IMODE(st.st_mode)
+
+    lines = data.split(b'\n')
+    if lines[-1] == b'':
+        lines.pop()
+    changed = st is None
+
+    def assigned(variable):
+        return [
+            (i, found[1])
+            for i, found in enumerate(map(_rc_conf_assignment, lines))
+            if found is not None and found[0] == variable
+        ]
+
+    for variable, value in (remove_if or {}).items():
+        found = assigned(variable.encode())
+        if found and found[-1][1] == value.encode():
+            for i, _ in reversed(found):
+                del lines[i]
+            changed = True
+
+    for variable, value in (set_values or {}).items():
+        found = assigned(variable.encode())
+        if found and found[-1][1] == value.encode():
+            continue
+        line = b'%s="%s"' % (variable.encode(), value.encode())
+        if found:
+            lines[found[-1][0]] = line
+        else:
+            lines.append(line)
+        changed = True
+
+    if not changed:
+        return 'unchanged'
+
+    write_jail_etc_file(
+        jail_root, name, data=b''.join(line + b'\n' for line in lines),
+        mode=mode
+    )
+    return 'written'
+
+
 def get_nested_key(_dict, keys=None):
     """Gets a nested key from a dictionary."""
 
@@ -700,46 +801,19 @@ def checkoutput(*args, **kwargs):
 
 
 def set_rcconf(jail_path, key, value):
-    conf_file = f"{jail_path}/root/etc/rc.conf"
-
-    found = False
-    changed = False
-
-    with open(conf_file, "r+") as f:
-
-        output = []
-
-        lines = f.read().splitlines()
-
-        for line in lines:
-
-            try:
-                current_key, current_value = line.split("=", 1)
-                current_value = current_value.strip("\"")
-            except ValueError:
-                output.append(line)
-
-                continue
-
-            if current_key == key:
-                found = True
-
-                if current_value != value:
-                    changed = True
-                    output.append(f"{key}=\"{value}\"")
-
-                    continue
-
-            output.append(line)
-
-        if not found:
-            output.append(f"{key}=\"{value}\"")
-            changed = True
-
-        if changed:
-            f.seek(0)
-            f.write("\n".join(output) + "\n")
-            f.truncate()
+    """
+    Set `key` in the jail's etc/rc.conf. The file is edited as text with
+    edit_jail_rc_conf, never through a link; one that
+    is not a plain file is left alone with a warning.
+    """
+    if edit_jail_rc_conf(
+        f'{jail_path}/root', 'rc.conf', set_values={key: value}, create=False
+    ) == 'not-a-file':
+        logit({
+            'level': 'WARNING',
+            'message': f'{jail_path}/root/etc/rc.conf not updated: it is'
+                       ' not a plain file'
+        })
 
 
 def parse_latest_release():

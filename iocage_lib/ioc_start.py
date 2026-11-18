@@ -1513,22 +1513,7 @@ class IOCStart(object):
                 if addr.upper() == check_var:
                     nics.append(nic)
 
-        rc_conf_path = os.path.join(self.path, 'root/etc/rc.conf')
-        if not os.path.exists(rc_conf_path):
-            os.makedirs(os.path.dirname(rc_conf_path), exist_ok=True)
-            open(rc_conf_path, 'w').close()
-            entries = {}
-        else:
-            with open(rc_conf_path, 'r') as f:
-                entries = {
-                    k: v.replace("'", '').replace('"', '')
-                    for k, v in map(
-                        lambda j: [e.strip() for e in j.strip().split('=', 1)],
-                        filter(
-                            lambda j: not j.strip().startswith('#') and '=' in j, f.readlines()
-                        )
-                    )
-                }
+        set_values, remove_if = {}, {}
         for nic in nics:
             if 'vnet' in nic:
                 # Inside jails they are epairNb
@@ -1537,12 +1522,12 @@ class IOCStart(object):
             key = f'ifconfig_{nic}' if ipv4 else f'ifconfig_{nic}_ipv6'
             value = 'SYNCDHCP' if ipv4 else 'inet6 auto_linklocal accept_rtadv autoconf'
             if enable:
-                cmd = [f'{key}={value}']
+                set_values[key] = value
             else:
-                cmd = ['-x', key] if key in entries and entries[key] == value else []
+                remove_if[key] = value
 
-            if cmd:
-                su.run(['sysrc', '-f', rc_conf_path] + cmd, stdout=su.PIPE)
+        # An absent rc.conf is created, as before.
+        self.__edit_rc_conf__(set_values, remove_if)
 
     def __check_rtsold__(self):
         if 'accept_rtadv' not in self.ip6_addr:
@@ -1556,13 +1541,25 @@ class IOCStart(object):
                 silent=self.silent
             )
 
-        su.run(
-            [
-                'sysrc', '-f', f'{self.path}/root/etc/rc.conf',
-                'rtsold_enable=YES'
-            ],
-            stdout=su.PIPE
-        )
+        self.__edit_rc_conf__({'rtsold_enable': 'YES'})
+
+    def __edit_rc_conf__(self, set_values=None, remove_if=None):
+        """
+        Set or remove variables in this jail's etc/rc.conf from the host, as
+        text. The file is the jail's: it is neither sourced (`sysrc -f` did
+        that, as root on the host) nor written through a link.
+        One that is not a plain file is left alone
+        with a warning and the start goes on.
+        """
+        if self.__jail_etc__(
+            iocage_lib.ioc_common.edit_jail_rc_conf, 'rc.conf',
+            set_values=set_values, remove_if=remove_if
+        ) == 'not-a-file':
+            iocage_lib.ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'{self.uuid}: etc/rc.conf not updated: it is'
+                           ' not a plain file'
+            }, _callback=self.callback, silent=self.silent)
 
     def get_default_interface(self):
         if self.host_gateways['ipv4']['interface']:

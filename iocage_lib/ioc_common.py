@@ -673,6 +673,54 @@ def write_jail_etc_file(jail_root, name, data=None, link=None, mode=0o644):
         os.close(etc_fd)
 
 
+def _jail_etc_lstat(jail_root, name):
+    """os.stat_result of `<jail_root>/etc/<name>` itself (a link is not followed), or None when
+    nothing is there. `etc` that is not a directory raises OSError."""
+    etc_fd = _jail_etc_fd(jail_root)
+    try:
+        try:
+            return os.stat(name, dir_fd=etc_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+    finally:
+        os.close(etc_fd)
+
+
+def jail_etc_kind(jail_root, name):
+    """'absent', 'file' or 'other' (a link, a FIFO, a directory) for `<jail_root>/etc/<name>`,
+    without following a link. `etc` that is not a directory raises OSError."""
+    st = _jail_etc_lstat(jail_root, name)
+    if st is None:
+        return 'absent'
+    return 'file' if stat.S_ISREG(st.st_mode) else 'other'
+
+
+def replace_in_jail_etc_file(jail_root, name, old, new):
+    """
+    Replace the text `old` by `new` in `<jail_root>/etc/<name>`, a file of the jail, from the host.
+
+    The file is read and replaced through read_/write_jail_etc_file, so a link left in its place
+    is neither read nor written through; an in-place edit by path (fileinput, open) copied a
+    linked host file's text into the jail. The other bytes and the mode are
+    kept. The result is 'written', 'unchanged', 'absent', or 'not-a-file' when something other
+    than a plain file is there, which is left alone. `etc` that is not a directory raises OSError.
+    """
+    st = _jail_etc_lstat(jail_root, name)
+    if st is None:
+        return 'absent'
+    if not stat.S_ISREG(st.st_mode):
+        return 'not-a-file'
+    data = read_jail_etc_file(jail_root, name, binary=True)
+    if data is None:
+        # Something else took its place since the stat.
+        return 'not-a-file'
+    replaced = data.replace(old.encode(), new.encode())
+    if replaced == data:
+        return 'unchanged'
+    write_jail_etc_file(jail_root, name, data=replaced, mode=stat.S_IMODE(st.st_mode))
+    return 'written'
+
+
 def _rc_conf_assignment(line):
     """
     (name, value) when an rc.conf line (bytes) assigns a variable the way
@@ -709,15 +757,7 @@ def edit_jail_rc_conf(jail_root, name='rc.conf', set_values=None,
     FileNotFoundError otherwise. `etc` that is not a directory raises
     OSError, as in the helpers.
     """
-    etc_fd = _jail_etc_fd(jail_root)
-    try:
-        try:
-            st = os.stat(name, dir_fd=etc_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            st = None
-    finally:
-        os.close(etc_fd)
-
+    st = _jail_etc_lstat(jail_root, name)
     if st is None:
         if not create:
             raise FileNotFoundError(

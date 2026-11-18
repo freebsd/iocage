@@ -26,6 +26,7 @@ import itertools
 import os
 import subprocess as su
 
+import iocage_lib.ioc_common
 import iocage_lib.ioc_json as ioc_json
 import iocage_lib.ioc_list as ioc_list
 
@@ -105,13 +106,9 @@ class IOCDebug(object):
 
         all_props = self.__get_jail_props__(name, path)
         fstab = self.__execute_debug__(['cat', f'{path}/fstab'], jail=name)
-        hosts = self.__execute_debug__(['cat', f'{jail_path}/etc/hosts'],
-                                       jail=name)
-        rc = self.__execute_debug__(['cat', f'{jail_path}/etc/rc.conf'],
-                                    jail=name)
-        nsswitch = self.__execute_debug__(
-            ['cat', f'{jail_path}/etc/nsswitch.conf'], jail=name
-        )
+        hosts = self.__jail_etc_lines__(jail_path, 'hosts')
+        rc = self.__jail_etc_lines__(jail_path, 'rc.conf')
+        nsswitch = self.__jail_etc_lines__(jail_path, 'nsswitch.conf')
 
         if all_props['state'] == 'up':
             ifconfig = self.__execute_debug__(['ifconfig', '-a'], jail=name,
@@ -121,9 +118,7 @@ class IOCDebug(object):
         else:
             ifconfig = netstat = [f'{name} not running -- cannot run command']
 
-        resolv = self.__execute_debug__(
-            ['cat', f'{jail_path}/etc/resolv.conf'], jail=name
-        )
+        resolv = self.__jail_etc_lines__(jail_path, 'resolv.conf')
 
         if all_props['state'] != 'CORRUPT':
             self.__write_debug__(all_props, jail_debug_path, 'PROPS',
@@ -140,6 +135,23 @@ class IOCDebug(object):
         self.__write_debug__(ifconfig, jail_debug_path, '\nIFCONFIG -a')
         self.__write_debug__(netstat, jail_debug_path, '\nNETSTAT -nr')
         self.__write_debug__(resolv, jail_debug_path, '\n/ETC/RESOLV.CONF')
+
+    @staticmethod
+    def __jail_etc_lines__(jail_root, name):
+        """
+        The lines of a jail's etc/<name> for the debug file. The file is the
+        jail's: it is read without following a link, which `cat` by path did,
+        putting a linked host file into the debug output.
+        """
+        try:
+            data = iocage_lib.ioc_common.read_jail_etc_file(
+                jail_root, name, binary=True
+            )
+        except OSError as e:
+            return [f'etc/{name} not read: {e.strerror}']
+        if data is None:
+            return [f'etc/{name} not read: absent or not a plain file']
+        return data.decode(errors='replace').splitlines()
 
     def __execute_debug__(self, command, jail=None, jexec=False):
         if jail is not None and jexec:

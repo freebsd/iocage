@@ -600,13 +600,22 @@ class IOCCreate(object):
                     for line in _clone_fstab.readlines():
                         _fstab.write(line.replace(clone_uuid, jail_uuid))
 
-            with open(clone_etc_hosts, "r") as _clone_etc_hosts:
-                with iocage_lib.ioc_common.open_atomic(
-                        clone_etc_hosts, "w") as etc_hosts:
-                    # open_atomic will empty the file, we need these still.
-
-                    for line in _clone_etc_hosts.readlines():
-                        etc_hosts.write(line.replace(clone_uuid, jail_uuid))
+            # the clone's etc/hosts is its source's; a link there is
+            # neither read nor replaced.
+            try:
+                iocage_lib.ioc_common.replace_in_jail_etc_file(
+                    os.path.dirname(os.path.dirname(clone_etc_hosts)), 'hosts',
+                    clone_uuid, jail_uuid
+                )
+            except OSError as e:
+                iocage_lib.ioc_common.logit({
+                    'level': 'WARNING',
+                    'message': f'{clone_etc_hosts} not updated: the jail\'s'
+                               f' root/etc is not a plain directory'
+                               f' ({e.strerror})'
+                },
+                    _callback=self.callback,
+                    silent=self.silent)
 
         if not self.empty:
             self.create_rc(
@@ -1035,8 +1044,23 @@ ipv6_activate_all_interfaces=\"YES\"
 """
             rc_conf.write_text(rcconf)
 
-        if not jail_rc_conf.is_file():
-            shutil.copy(str(rc_conf), str(jail_rc_conf))
+        # a clone's root is its source's, links and all. The default rc.conf
+        # is written only where there is none, and never through a link.
+        try:
+            if iocage_lib.ioc_common.jail_etc_kind(
+                f'{location}/root', 'rc.conf'
+            ) == 'absent':
+                iocage_lib.ioc_common.write_jail_etc_file(
+                    f'{location}/root', 'rc.conf', data=rc_conf.read_bytes()
+                )
+        except OSError as e:
+            iocage_lib.ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'{jail_rc_conf} not written: the jail\'s root/etc'
+                           f' is not a plain directory ({e.strerror})'
+            },
+                _callback=self.callback,
+                silent=self.silent)
 
         if basejail:
             su.Popen(

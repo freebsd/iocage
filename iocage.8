@@ -368,6 +368,24 @@ Creates three jail clones of exampjail.
 .It Cm console
 Execute login to open a shell inside the jail.
 .Pp
+Supply the jail's NAME or UUID, or a prefix that identifies exactly one jail.
+Ambiguous prefixes are rejected.
+The console uses the jail's effective
+.Cm login_flags
+and
+.Cm exec_fib
+properties, including inherited defaults.
+By default,
+.Cm login_flags
+is
+.Qq -f root .
+.Pp
+The jail must be running unless
+.Fl f
+is supplied.
+If it stops after its state has been checked, the login fails without
+automatically restarting the jail.
+.Pp
 Options:
 .Bl -tag -width "[-f | --force TEXT]"
 .It Op Fl f | -force

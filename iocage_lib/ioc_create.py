@@ -28,6 +28,7 @@ import os
 import pathlib
 import re
 import subprocess as su
+import sys
 import uuid
 
 import iocage_lib.ioc_common
@@ -651,6 +652,38 @@ class IOCCreate(object):
 
             iocjson.json_write(config)
 
+        try:
+            if self.pkglist:
+                auto_config = config.get('dhcp') or \
+                    config.get('ip_hostname') or \
+                    config.get('nat')
+
+                if config.get('ip4_addr', 'none') == "none" and \
+                    config.get('ip6_addr', 'none') == "none" and \
+                        not auto_config:
+                    iocage_lib.ioc_common.logit({
+                        "level": "WARNING",
+                        "message": "You need an IP address for the jail to"
+                                   " install packages!\n"
+                    },
+                        _callback=self.callback,
+                        silent=self.silent)
+                else:
+                    self.create_install_packages(
+                        jail_uuid, location, raise_on_error=True
+                    )
+
+            if start:
+                iocage_lib.ioc_start.IOCStart(jail_uuid, location,
+                                              silent=self.silent)
+
+        finally:
+            if is_template:
+                # Restore readonly even when setup or boot fails.
+                Dataset(
+                    os.path.join(self.pool, 'iocage/templates', jail_uuid)
+                ).set_property('readonly', 'on')
+
         if not self.plugin:
             if self.clone:
                 msg = f"{jail_uuid} successfully cloned!"
@@ -663,34 +696,6 @@ class IOCCreate(object):
             },
                 _callback=self.callback,
                 silent=self.silent)
-
-        if self.pkglist:
-            auto_config = config.get('dhcp') or \
-                config.get('ip_hostname') or \
-                config.get('nat')
-
-            if config.get('ip4_addr', 'none') == "none" and \
-                config.get('ip6_addr', 'none') == "none" and \
-                    not auto_config:
-                iocage_lib.ioc_common.logit({
-                    "level": "WARNING",
-                    "message": "You need an IP address for the jail to"
-                               " install packages!\n"
-                },
-                    _callback=self.callback,
-                    silent=self.silent)
-            else:
-                self.create_install_packages(jail_uuid, location)
-
-        if start:
-            iocage_lib.ioc_start.IOCStart(jail_uuid, location,
-                                          silent=self.silent)
-
-        if is_template:
-            # We have to set readonly back, since we're done with our tasks
-            Dataset(
-                os.path.join(self.pool, 'iocage/templates', jail_uuid)
-            ).set_property('readonly', 'on')
 
         return jail_uuid
 
@@ -734,21 +739,90 @@ class IOCCreate(object):
 
         return jail_props
 
-    def create_install_packages(self, jail_uuid, location,
-                                repo="pkg.freebsd.org"):
+    def create_install_packages(
+        self, jail_uuid, location, repo="pkg.freebsd.org", *, raise_on_error=False
+    ):
         """
         Takes a list of pkg's to install into the target jail. The resolver
         property is required for pkg to have network access.
+
+        Set raise_on_error for regular jail creation. Existing library callers
+        retain their logging or plugin error-summary behavior by default.
         """
-        started = False
+        template = None
+        if pathlib.Path(location).parent.name == 'templates':
+            template = Dataset(location)
+            readonly = template.properties['readonly']
+
         status, jid = iocage_lib.ioc_list.IOCList().list_get_jid(jail_uuid)
+        started = not status
+        result = None
+        try:
+            if started:
+                try:
+                    iocage_lib.ioc_start.IOCStart(
+                        jail_uuid, location, silent=True
+                    )
+                except (iocage_lib.ioc_exceptions.JailRunning,
+                        SystemExit) as error:
+                    start_error = (
+                        error.__cause__ if isinstance(error, SystemExit)
+                        else error
+                    )
+                    if isinstance(start_error,
+                                  iocage_lib.ioc_exceptions.JailRunning):
+                        # A concurrent start owns the jail and template state.
+                        started = False
+                        template = None
+                    raise
+                status, jid = iocage_lib.ioc_list.IOCList().list_get_jid(
+                    jail_uuid
+                )
+                if not status:
+                    raise RuntimeError(f'{jail_uuid} did not start')
 
-        if not status:
-            iocage_lib.ioc_start.IOCStart(jail_uuid, location, silent=True)
-            started, jid = iocage_lib.ioc_list.IOCList().list_get_jid(
-                jail_uuid
-            )
+            if template is not None:
+                # Startup writes configuration and makes templates readonly.
+                template.set_property('readonly', 'off')
+            result = self._install_packages(jail_uuid, location, jid, repo)
+        finally:
+            failure = sys.exc_info()[1]
+            try:
+                try:
+                    if started:
+                        running, _ = iocage_lib.ioc_list.IOCList().list_get_jid(
+                            jail_uuid
+                        )
+                        if running:
+                            iocage_lib.ioc_stop.IOCStop(
+                                jail_uuid, location, silent=True
+                            )
+                finally:
+                    if template is not None:
+                        template.set_property('readonly', readonly)
+            except (Exception, SystemExit):
+                # Keep the installation diagnostic if cleanup also fails.
+                if failure is not None or result:
+                    iocage_lib.ioc_common.logit({
+                        'level': 'ERROR',
+                        'message': (
+                            str(failure) if failure is not None else
+                            '\n'.join(result)
+                        )
+                    }, _callback=self.callback)
+                raise
 
+        if result:
+            if self.plugin:
+                return ','.join(result)
+            if raise_on_error:
+                iocage_lib.ioc_common.logit({
+                    'level': 'EXCEPTION',
+                    'message': '\npkg error:\n  - ' + '\n  - '.join(result)
+                }, _callback=self.callback)
+
+    def _install_packages(self, jail_uuid, location, jid, repo):
+        """Install packages while the caller owns jail and template cleanup."""
         if repo:
             r = re.match('(https?(://)?)?([^/]+)', repo)
             if r and len(r.groups()) >= 3:
@@ -915,11 +989,9 @@ class IOCCreate(object):
                     log=not self.silent
                 )
         except iocage_lib.ioc_exceptions.CommandFailed as e:
-            iocage_lib.ioc_stop.IOCStop(jail_uuid, location, force=True,
-                                        silent=True)
             iocage_lib.ioc_common.logit({
                 "level": "EXCEPTION",
-                "message": e.message.decode().rstrip()
+                "message": b''.join(e.message).decode(errors='replace').strip()
             },
                 _callback=self.callback)
 
@@ -961,10 +1033,9 @@ class IOCCreate(object):
                             log=not (self.silent)
                         )
                 except iocage_lib.ioc_exceptions.CommandFailed as e:
-                    nonempty_lines = [line.rstrip() for line in e.message if line.rstrip()]
-                    pkg_stderr = ''
-                    if len(nonempty_lines) > 0:
-                        pkg_stderr = nonempty_lines[-1].decode()
+                    pkg_stderr = b''.join(e.message).decode(
+                        errors='replace'
+                    ).strip() or 'pkg failed without an error message'
                     pkg_err = True
 
                 if not pkg_err:
@@ -982,24 +1053,16 @@ class IOCCreate(object):
 
                 if pkg_retry <= 2:
                     pkg_retry += 1
-                elif pkg_retry == 3 and not self.plugin:
-                    iocage_lib.ioc_common.logit(
-                        {
-                            "level": "ERROR",
-                            "message": pkg_stderr
-                        },
-                        _callback=self.callback)
-                    break
                 elif pkg_retry == 3:
                     if pkg_err_msg not in pkg_err_list:
                         pkg_err_list.append(pkg_err_msg)
+                    if not self.plugin:
+                        iocage_lib.ioc_common.logit({
+                            'level': 'ERROR', 'message': pkg_stderr
+                        }, _callback=self.callback)
                     break
 
-        if started:
-            iocage_lib.ioc_stop.IOCStop(jail_uuid, location, silent=True)
-
-        if self.plugin and pkg_err_list:
-            return ','.join(pkg_err_list)
+        return pkg_err_list
 
     def create_rc(self, location, host_hostname, basejail=0):
         """

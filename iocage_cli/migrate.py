@@ -23,7 +23,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """migrate module for the cli."""
 import datetime
-import fileinput
 import os
 import shutil
 import subprocess as su
@@ -145,12 +144,14 @@ def cli(force, delete):
             shutil.copy(f"{iocroot}/jails_old/{uuid}/fstab",
                         f"{iocroot}/jails/{new_uuid}/fstab")
 
-            for line in fileinput.input(
-                    f"{iocroot}/jails/{new_uuid}/root/etc/"
-                    "rc.conf", inplace=1):
-                print(
-                    line.replace(f'hostname="{uuid}"',
-                                 f'hostname="{new_uuid}"').rstrip())
+            # never through a link in the jail's etc.
+            try:
+                ioc_common.replace_in_jail_etc_file(
+                    f"{iocroot}/jails/{new_uuid}/root", 'rc.conf',
+                    f'hostname="{uuid}"', f'hostname="{new_uuid}"'
+                )
+            except OSError:
+                pass
 
             if delete:
                 try:

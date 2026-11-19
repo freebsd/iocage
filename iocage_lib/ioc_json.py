@@ -2821,12 +2821,14 @@ class IOCJson(IOCConfiguration):
                     if new_jail_parent_ds_obj.exists:
                         new_jail_parent_ds_obj.set_property('jailed', 'on')
 
-                    for line in fileinput.input(
-                            f"{self.iocroot}/jails/{tag}/root/etc/rc.conf",
-                            inplace=1):
-                        print(
-                            line.replace(f'hostname="{uuid}"',
-                                         f'hostname="{tag}"').rstrip())
+                    # never through a link in the jail's etc.
+                    try:
+                        iocage_lib.ioc_common.replace_in_jail_etc_file(
+                            f"{self.iocroot}/jails/{tag}/root", 'rc.conf',
+                            f'hostname="{uuid}"', f'hostname="{tag}"'
+                        )
+                    except OSError:
+                        pass
 
                     if iocage_lib.ioc_common.check_truthy(conf["basejail"]):
                         for line in fileinput.input(

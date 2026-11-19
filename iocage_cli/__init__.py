@@ -61,6 +61,8 @@ def _configure_runtime():
                 pass
     set_interactive(True)
 
+    # A shell can start iocage with SIGINT ignored. Restore Ctrl-C handling.
+    # https://stackoverflow.com/a/40785230
     signal.signal(signal.SIGINT, signal.default_int_handler)
     # Exit quietly when the output pipe is closed, for example by head.
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)

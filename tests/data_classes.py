@@ -283,9 +283,10 @@ class ZFS:
     def set_pool(self):
         if not self.pool:
             with libzfs.ZFS() as zfs:
+                # Only root properties are needed to find the active pool.
                 pools = [
                     p for p in zfs.pools
-                    if p.root_dataset.__getstate__().get(
+                    if p.root_dataset.asdict(recursive=False).get(
                         'properties'
                     ).get(
                         'org.freebsd.ioc:active', {}
@@ -301,7 +302,7 @@ class ZFS:
     @staticmethod
     def get(identifier):
         with libzfs.ZFS() as zfs:
-            return zfs.get(identifier).__getstate__()
+            return zfs.get(identifier).asdict()
 
     def _zfs_get_properties(self, identifier):
         if '/' in identifier:
@@ -322,29 +323,33 @@ class ZFS:
     def get_dataset(self, dataset_name):
         try:
             with libzfs.ZFS() as zfs:
-                return zfs.get_dataset(dataset_name).__getstate__()
+                return zfs.get_dataset(dataset_name).asdict()
         except libzfs.ZFSException:
             pass
 
     @staticmethod
     def get_snapshots_recursively(dataset_name):
         with libzfs.ZFS() as zfs:
-            return zfs.get_dataset(dataset_name).__getstate__(
-                snapshots_recursive=True
-            )['snapshots_recursive']
+            dataset = zfs.get_dataset(dataset_name)
+            # libzfs 2.0.1's recursive serializer calls a generator as a function.
+            return [
+                s.asdict()
+                for ds in itertools.chain((dataset,), dataset.children_recursive)
+                for s in ds.snapshots
+            ]
 
     @staticmethod
     def get_snapshots(dataset_name):
         with libzfs.ZFS() as zfs:
-            return zfs.get_dataset(dataset_name).__getstate__(
-                snapshots=True
-            )['snapshots']
+            return [
+                s.asdict() for s in zfs.get_dataset(dataset_name).snapshots
+            ]
 
     @staticmethod
     def get_snapshot_safely(snap):
         try:
             with libzfs.ZFS() as zfs:
-                return zfs.get_snapshot(snap).__getstate__()
+                return zfs.get_snapshot(snap).asdict()
         except libzfs.ZFSException:
             pass
 

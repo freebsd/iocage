@@ -27,8 +27,6 @@ import re
 import pytest
 import requests
 
-from distutils.version import StrictVersion
-
 require_root = pytest.mark.require_root
 require_zpool = pytest.mark.require_zpool
 require_upgrade = pytest.mark.require_upgrade

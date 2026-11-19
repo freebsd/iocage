@@ -52,19 +52,18 @@ def test_01_df(
 @require_root
 @require_zpool
 def test_02_df_sort_flag(
-        invoke_cli, resource_selector, jails_as_rows, parse_rows_output
+        invoke_cli, resource_selector, parse_rows_output
 ):
     flags = ['name', 'crt', 'res', 'qta', 'use', 'ava']
-    verify_list = jails_as_rows(
-        resource_selector.all_jails, short_name=False
-    )
+    expected_names = sorted(jail.name for jail in resource_selector.all_jails)
 
     for flag in flags:
         result = invoke_cli(
             ['df', '-s', flag]
         )
 
-        orig_list = parse_rows_output(result.output, 'df')
-        verify_list.sort(key=lambda r: r.sort_flag(flag))
-
-        assert verify_list == orig_list, f'Mismatched df output for flag {flag}'
+        rows = parse_rows_output(result.output, 'df')
+        assert sorted(row.orig_name for row in rows) == expected_names
+        # ZFS usage can change between commands. Check the values df printed.
+        keys = [row.sort_flag(flag) for row in rows]
+        assert keys == sorted(keys), f'Mismatched df output for flag {flag}'

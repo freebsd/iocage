@@ -7,8 +7,13 @@ permissions:
 
 jobs:
   functional:
+    name: FreeBSD ${{ matrix.release }} functional tests
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["14.5", "15.1"]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -16,7 +21,7 @@ jobs:
       - name: Run the jail lifecycle suite in a disposable FreeBSD VM
         uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
         with:
-          release: "15.1"
+          release: ${{ matrix.release }}
           # Keep the JUnit report on the runner even when pytest exits nonzero.
           sync: sshfs
           prepare: |
@@ -37,11 +42,11 @@ jobs:
 
             mkdir -p reports
             python -m pytest tests/functional_tests -o addopts= -v -ra \
-              --zpool=pool --release=15.1-RELEASE --image \
+              --zpool=pool --release=${{ matrix.release }}-RELEASE --image \
               --server=https://download.freebsd.org --junitxml=reports/functional.xml
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: freebsd-functional-results
+          name: freebsd-${{ matrix.release }}-functional-results
           path: reports/functional.xml
           if-no-files-found: error

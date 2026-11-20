@@ -10,7 +10,7 @@ is where an IP address is assigned to the host's interface and then used
 by the jail for network communication. This is typically known as
 "shared IP" based jails.
 
-Another recently developed option is called VNET or sometimes VIMAGE.
+Another option is called VNET or sometimes VIMAGE.
 VNET is a fully virtualized networking stack which is isolated per jail.
 VNET abstracts virtual network interfaces to jails, which then behave in
 the same way as physical interfaces.
@@ -82,25 +82,14 @@ with a :kbd:`,`:
 VIMAGE/VNET
 -----------
 
-VNET is considered experimental. Unexpected system crashes
-can occur. More details about issues with VNET are available in the
-:ref:`Known Issues` section of this documentation.
-
 There are a number of required steps when configuring a jail to use
 VNET:
 
 **Kernel**
 
-.. tip:: If not required, disable SCTP.
-
-Rebuild the kernel with these options:
-
-.. code-block:: none
-
-   nooptions       SCTP   # Stream Control Transmission Protocol
-   options         VIMAGE # VNET/Vimage support
-   options         RACCT  # Resource containers
-   options         RCTL   # same as above
+Supported FreeBSD GENERIC kernels include VNET support. A custom kernel must
+retain ``options VIMAGE``. Resource accounting is needed only when using
+resource limits; see :ref:`Resource Limits` for the required configuration.
 
 **/etc/rc.conf**
 
@@ -208,7 +197,7 @@ Configuring a Shared IP Jail
 
 :samp:`# iocage set ip6_addr="em0|2001:123:456:242::5/64" examplejail`
 
-These examples add IP alias *192.168.0.10/24* and *2001:123:456::5/64*
+These examples add IP aliases *192.168.0.10/24* and *2001:123:456:242::5/64*
 to interface *em0* of the shared IP jail, at start time.
 
 .. index:: Configure VNET Jail
@@ -227,12 +216,12 @@ To configure both IPv4 and IPv6:
 
 .. note:: For VNET jails, a default route has to also be specified.
 
-To create a a jail with a DHCP interface add the `dhcp=on` property:
+To create a jail with a DHCP interface add the `dhcp=on` property:
 
-:samp:`# iocage create -r 11.0-RELEASE --name myjail dhcp=on`
+:samp:`# iocage create -r 15.1-RELEASE --name myjail dhcp=on`
 
 The `dhcp=on` property implies creating a VNET virtual network stack and
-enabling the Berkley Packet Filter. DHCP cannot work without VNET.
+enabling the Berkeley Packet Filter. DHCP cannot work without VNET.
 More information about VNET is available in the VNET(9) FreeBSD manual page.
 
 .. index:: Tips for configuring VNET

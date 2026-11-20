@@ -170,7 +170,13 @@ def cli(
             # scheme
             iocroot = ioc.PoolAndDataset().get_iocroot()
             path = f'{iocroot}/releases/{release}/root'
-            _release = ioc_common.get_jail_freebsd_version(path, release)
+            try:
+                _release = ioc_common.get_jail_freebsd_version(path, release)
+            except ValueError as error:
+                ioc_common.logit({
+                    'level': 'EXCEPTION',
+                    'message': str(error)
+                })
 
             try:
                 ioc_common.check_release_newer(_release, major_only=True)

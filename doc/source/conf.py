@@ -18,18 +18,43 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../..'))
 
 # -- General configuration ------------------------------------------------
 
-# If your documentation needs a minimal Sphinx version, state it here.
-#
-# needs_sphinx = '1.0'
+needs_sphinx = '8.2'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc']
+
+# libzfs bindings are only needed by functional tests, not documentation builds.
+autodoc_mock_imports = ['libzfs']
+
+
+def setup(app):
+    from contextlib import ExitStack
+    from sphinx.ext.autodoc.mock import mock
+
+    # Source analysis can import modules outside autodoc's import context.
+    # Keep the native binding mocked until the build is complete.
+    imports = ExitStack()
+    imports.enter_context(mock(autodoc_mock_imports))
+
+    def finish_build(app, exception):
+        imports.close()
+        if exception is None:
+            # A successful build must retain the real CLI API reference.
+            objects = app.env.get_domain('py').objects
+            required = ('IOCageCLI', 'IOCLogger', 'print_version')
+            missing = [name for name in required
+                       if f'iocage_cli.{name}' not in objects]
+            if missing:
+                raise RuntimeError(f'Missing CLI API documentation: {missing}')
+
+    app.connect('build-finished', finish_build)
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -66,7 +91,7 @@ release = u'DEV'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

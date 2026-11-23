@@ -8,7 +8,7 @@ permissions:
 jobs:
   functional:
     name: FreeBSD ${{ matrix.release }} functional tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Run the jail lifecycle suite in a disposable FreeBSD VM
-        uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
         with:
           release: ${{ matrix.release }}
           # Keep the JUnit report on the runner even when pytest exits nonzero.
@@ -31,9 +31,10 @@ jobs:
             pkg install -y "$py-libzfs" "$py-netifaces" "$py-jsonschema" "$py-pip" "$py-pytest"
           run: |
             set -eu
+            # Read pkg's libzfs bindings while installing iocage into the venv.
             python3 -m venv --system-site-packages --without-pip /tmp/iocage-venv
             export PATH="/tmp/iocage-venv/bin:$PATH"
-            python -m pip install .
+            /tmp/iocage-venv/bin/python -m pip install .
             python -c 'import libzfs'
 
             truncate -s 20G /var/tmp/iocage-pool.img

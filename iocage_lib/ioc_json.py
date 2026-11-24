@@ -23,6 +23,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """Convert, load or write JSON."""
 import collections
+import contextlib
 import datetime
 import fileinput
 import ipaddress
@@ -2822,13 +2823,13 @@ class IOCJson(IOCConfiguration):
                         new_jail_parent_ds_obj.set_property('jailed', 'on')
 
                     # never through a link in the jail's etc.
-                    try:
+                    with contextlib.suppress(
+                        iocage_lib.ioc_common.JailEtcUnreachable
+                    ):
                         iocage_lib.ioc_common.replace_in_jail_etc_file(
                             f"{self.iocroot}/jails/{tag}/root", 'rc.conf',
                             f'hostname="{uuid}"', f'hostname="{tag}"'
                         )
-                    except OSError:
-                        pass
 
                     if iocage_lib.ioc_common.check_truthy(conf["basejail"]):
                         for line in fileinput.input(

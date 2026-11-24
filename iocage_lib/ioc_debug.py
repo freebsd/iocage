@@ -148,10 +148,14 @@ class IOCDebug(object):
                 jail_root, name, binary=True
             )
         except OSError as e:
-            return [f'etc/{name} not read: {e.strerror}']
+            return [f'etc/{name} not read: {e}']
         if data is None:
-            return [f'etc/{name} not read: absent or not a plain file']
-        return data.decode(errors='replace').splitlines()
+            return [
+                f'etc/{name} not read: absent, not a plain file, or over'
+                f' {iocage_lib.ioc_common.JAIL_ETC_FILE_MAX >> 20} MiB'
+            ]
+        # Bytes that are not UTF-8 are shown escaped (\xff), not replaced.
+        return data.decode(errors='backslashreplace').splitlines()
 
     def __execute_debug__(self, command, jail=None, jexec=False):
         if jail is not None and jexec:

@@ -180,13 +180,15 @@ def test_debug_reads_a_plain_file_and_never_through_a_link(
         b'127.0.0.1 localhost\n\xff odd\n'
     )
     assert lines(str(jail_root), 'hosts') == [
-        '127.0.0.1 localhost', '� odd'
+        '127.0.0.1 localhost', '\\xff odd'
     ]
     (jail_root / 'etc' / 'rc.conf').symlink_to(host_file)
     answer = lines(str(jail_root), 'rc.conf')
-    assert answer == ['etc/rc.conf not read: absent or not a plain file']
+    assert answer == [
+        'etc/rc.conf not read: absent, not a plain file, or over 16 MiB'
+    ]
     assert lines(str(jail_root), 'nsswitch.conf') == [
-        'etc/nsswitch.conf not read: absent or not a plain file'
+        'etc/nsswitch.conf not read: absent, not a plain file, or over 16 MiB'
     ]
 
 

@@ -23,7 +23,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 """This is responsible for starting jails."""
 import datetime
-import errno
 import hashlib
 import os
 import stat
@@ -426,26 +425,27 @@ class IOCStart(object):
 
                 # read and replace the jail's hosts
                 # without following a link inside the jail.
-                hosts = self.__jail_etc__(
-                    iocage_lib.ioc_common.read_jail_etc_file, 'hosts'
-                )
-                if hosts is None:
-                    iocage_lib.ioc_common.logit({
-                        'level': 'WARNING',
-                        'message': f'{self.uuid}: etc/hosts not updated:'
-                                   ' it is not a plain file'
-                    }, _callback=self.callback, silent=self.silent)
-                else:
-                    lines = []
-                    for line in hosts.splitlines(keepends=True):
-                        if line.startswith('127.0.0.1'):
-                            line = line.replace('127.0.0.1', localhost_ip)
-
-                        lines.append(line)
-                    self.__jail_etc__(
-                        iocage_lib.ioc_common.write_jail_etc_file, 'hosts',
-                        data=''.join(lines).encode(), mode=0o644
+                try:
+                    hosts = iocage_lib.ioc_common.read_jail_etc_file(
+                        f'{self.path}/root', 'hosts'
                     )
+                    if hosts is None:
+                        self.__etc_not_a_file__('hosts')
+                    else:
+                        lines = []
+                        for line in hosts.splitlines(keepends=True):
+                            if line.startswith('127.0.0.1'):
+                                line = line.replace(
+                                    '127.0.0.1', localhost_ip
+                                )
+
+                            lines.append(line)
+                        iocage_lib.ioc_common.write_jail_etc_file(
+                            f'{self.path}/root', 'hosts',
+                            data=''.join(lines).encode(), mode=0o644
+                        )
+                except iocage_lib.ioc_common.JailEtcUnreachable as e:
+                    self.__etc_unreachable__('hosts', e)
 
                 if self.check_aliases(localhost_ip, '4') != localhost_ip:
                     su.run(['ifconfig', 'lo0', 'alias', f'{localhost_ip}/32'])
@@ -1413,8 +1413,7 @@ class IOCStart(object):
         # following a link inside the jail. Contents and modes are as before:
         # a custom resolver is written 0644 (open_atomic's mode), a copied
         # file keeps its source's mode (shutil.copy's).
-        if resolver != "/etc/resolv.conf" and resolver != "none" and \
-                resolver != "/dev/null":
+        if resolver not in ("/etc/resolv.conf", "none", "/dev/null"):
             content = {
                 'data': ''.join(
                     f'{line}\n' for line in resolver.split(";")
@@ -1447,18 +1446,24 @@ class IOCStart(object):
         """
         try:
             return operation(f'{self.path}/root', name, **kwargs)
-        except OSError as e:
-            if e.errno not in (
-                errno.ENOTDIR, errno.ENOENT, errno.EMLINK, errno.ELOOP
-            ):
-                raise
-            iocage_lib.ioc_common.logit({
-                'level': 'WARNING',
-                'message': f'{self.uuid}: etc/{name} not updated: the'
-                           f' jail\'s root/etc is not a plain directory'
-                           f' ({e.strerror})'
-            }, _callback=self.callback, silent=self.silent)
+        except iocage_lib.ioc_common.JailEtcUnreachable as e:
+            self.__etc_unreachable__(name, e)
             return None
+
+    def __etc_unreachable__(self, name, error):
+        iocage_lib.ioc_common.logit({
+            'level': 'WARNING',
+            'message': f'{self.uuid}: etc/{name} not updated:'
+                       f' {error.filename} is {error.strerror}'
+        }, _callback=self.callback, silent=self.silent)
+
+    def __etc_not_a_file__(self, name):
+        iocage_lib.ioc_common.logit({
+            'level': 'WARNING',
+            'message': f'{self.uuid}: etc/{name} not updated: it is not a'
+                       ' plain file, or is over'
+                       f' {iocage_lib.ioc_common.JAIL_ETC_FILE_MAX >> 20} MiB'
+        }, _callback=self.callback, silent=self.silent)
 
     def __generate_mac_bytes(self, nic):
         m = hashlib.md5()
@@ -1548,18 +1553,14 @@ class IOCStart(object):
         Set or remove variables in this jail's etc/rc.conf from the host, as
         text. The file is the jail's: it is neither sourced (`sysrc -f` did
         that, as root on the host) nor written through a link.
-        One that is not a plain file is left alone
-        with a warning and the start goes on.
+        One that is not a plain file, or is over JAIL_ETC_FILE_MAX, is left
+        alone with a warning and the start goes on.
         """
         if self.__jail_etc__(
             iocage_lib.ioc_common.edit_jail_rc_conf, 'rc.conf',
             set_values=set_values, remove_if=remove_if
         ) == 'not-a-file':
-            iocage_lib.ioc_common.logit({
-                'level': 'WARNING',
-                'message': f'{self.uuid}: etc/rc.conf not updated: it is'
-                           ' not a plain file'
-            }, _callback=self.callback, silent=self.silent)
+            self.__etc_not_a_file__('rc.conf')
 
     def get_default_interface(self):
         if self.host_gateways['ipv4']['interface']:

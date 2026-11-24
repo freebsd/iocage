@@ -595,20 +595,50 @@ def open_atomic(filepath, *args, **kwargs):
         os.chmod(filepath, 0o644)
 
 
+# The largest file of a jail's etc the host reads. The files it reads
+# (rc.conf, hosts, ...) are small, a hosts block list a few MiB; root in the
+# jail can make one as large as its quota, or sparse and larger still.
+JAIL_ETC_FILE_MAX = 16 * 1024 * 1024
+
+
+class JailEtcUnreachable(OSError):
+    """
+    A jail's root or its etc is missing or is not a plain directory (a link,
+    say), so the helpers below do not go through it. `filename` is the path
+    that was refused.
+    """
+
+
 def _jail_etc_fd(jail_root):
     dflags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-    root_fd = os.open(jail_root, dflags)
+    path = jail_root
     try:
-        return os.open('etc', dflags, dir_fd=root_fd)
-    finally:
-        os.close(root_fd)
+        root_fd = os.open(jail_root, dflags)
+        try:
+            path = os.path.join(jail_root, 'etc')
+            # Only the etc fd is returned; root_fd is not needed after this.
+            return os.open('etc', dflags, dir_fd=root_fd)
+        finally:
+            os.close(root_fd)
+    except OSError as e:
+        # A link: EMLINK on FreeBSD, ENOTDIR or ELOOP elsewhere.
+        if e.errno not in (
+            errno.ENOENT, errno.ENOTDIR, errno.EMLINK, errno.ELOOP
+        ):
+            raise
+        what = 'missing' if e.errno == errno.ENOENT else \
+            'not a plain directory'
+        raise JailEtcUnreachable(
+            e.errno, f'{what} ({e.strerror})', path
+        ) from e
 
 
 def read_jail_etc_file(jail_root, name, binary=False):
     """
     The text of `<jail_root>/etc/<name>` (its bytes with `binary`), or None
-    when it is absent or not a regular file. No link inside the jail is
-    followed: `etc` that is not a directory raises OSError.
+    when it is absent, not a regular file, or larger than JAIL_ETC_FILE_MAX.
+    No link inside the jail is followed: a root or `etc` that is not a
+    directory raises JailEtcUnreachable.
     """
     etc_fd = _jail_etc_fd(jail_root)
     try:
@@ -617,14 +647,23 @@ def read_jail_etc_file(jail_root, name, binary=False):
                 name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK |
                 os.O_CLOEXEC, dir_fd=etc_fd
             )
+        except FileNotFoundError:
+            return None
         except OSError as e:
-            if e.errno in (errno.EMLINK, errno.ELOOP, errno.ENOENT):
+            # A link: EMLINK on FreeBSD, ELOOP elsewhere.
+            if e.errno in (errno.EMLINK, errno.ELOOP):
                 return None
             raise
         with os.fdopen(fd, 'rb' if binary else 'r') as f:
-            if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            st = os.fstat(f.fileno())
+            if not stat.S_ISREG(st.st_mode) or \
+                    st.st_size > JAIL_ETC_FILE_MAX:
                 return None
-            return f.read()
+            data = f.read(JAIL_ETC_FILE_MAX + 1)
+            # It can grow after the fstat while its jail runs.
+            if len(data) > JAIL_ETC_FILE_MAX:
+                return None
+            return data
     finally:
         os.close(etc_fd)
 
@@ -638,15 +677,14 @@ def write_jail_etc_file(jail_root, name, data=None, link=None, mode=0o644):
     `etc` is opened with O_NOFOLLOW; the new file is created next to the old
     one under a temporary name (O_EXCL | O_NOFOLLOW) and renamed over it, so
     whatever was there -- a file, a link, a FIFO -- is replaced, never
-    written into. `etc` that is not a directory raises OSError.
+    written into. A root or `etc` that is not a directory raises
+    JailEtcUnreachable.
     """
     etc_fd = _jail_etc_fd(jail_root)
     tmp_name = f'.{name}.iocage-{os.getpid()}'
     try:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_name, dir_fd=etc_fd)
-        except FileNotFoundError:
-            pass
         try:
             if link is not None:
                 os.symlink(link, tmp_name, dir_fd=etc_fd)
@@ -655,19 +693,15 @@ def write_jail_etc_file(jail_root, name, data=None, link=None, mode=0o644):
                     tmp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                     os.O_NOFOLLOW | os.O_CLOEXEC, mode, dir_fd=etc_fd
                 )
-                try:
-                    view = memoryview(data)
-                    while view:
-                        view = view[os.write(fd, view):]
-                    os.fchmod(fd, mode)
-                finally:
-                    os.close(fd)
+                with os.fdopen(fd, 'wb') as f:
+                    f.write(data)
+                    os.fchmod(f.fileno(), mode)
             os.rename(tmp_name, name, src_dir_fd=etc_fd, dst_dir_fd=etc_fd)
         except BaseException:
-            try:
+            # Re-raised; the temporary file is removed first, so that an
+            # interrupt (KeyboardInterrupt too) leaves none in the jail's etc.
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_name, dir_fd=etc_fd)
-            except OSError:
-                pass
             raise
     finally:
         os.close(etc_fd)
@@ -675,7 +709,8 @@ def write_jail_etc_file(jail_root, name, data=None, link=None, mode=0o644):
 
 def _jail_etc_lstat(jail_root, name):
     """os.stat_result of `<jail_root>/etc/<name>` itself (a link is not followed), or None when
-    nothing is there. `etc` that is not a directory raises OSError."""
+    nothing is there. A root or `etc` that is not a directory raises
+    JailEtcUnreachable."""
     etc_fd = _jail_etc_fd(jail_root)
     try:
         try:
@@ -688,7 +723,8 @@ def _jail_etc_lstat(jail_root, name):
 
 def jail_etc_kind(jail_root, name):
     """'absent', 'file' or 'other' (a link, a FIFO, a directory) for `<jail_root>/etc/<name>`,
-    without following a link. `etc` that is not a directory raises OSError."""
+    without following a link. A root or `etc` that is not a directory raises
+    JailEtcUnreachable."""
     st = _jail_etc_lstat(jail_root, name)
     if st is None:
         return 'absent'
@@ -703,7 +739,8 @@ def replace_in_jail_etc_file(jail_root, name, old, new):
     is neither read nor written through; an in-place edit by path (fileinput, open) copied a
     linked host file's text into the jail. The other bytes and the mode are
     kept. The result is 'written', 'unchanged', 'absent', or 'not-a-file' when something other
-    than a plain file is there, which is left alone. `etc` that is not a directory raises OSError.
+    than a plain file is there, or one over JAIL_ETC_FILE_MAX, which is left alone. A root or
+    `etc` that is not a directory raises JailEtcUnreachable.
     """
     st = _jail_etc_lstat(jail_root, name)
     if st is None:
@@ -712,7 +749,8 @@ def replace_in_jail_etc_file(jail_root, name, old, new):
         return 'not-a-file'
     data = read_jail_etc_file(jail_root, name, binary=True)
     if data is None:
-        # Something else took its place since the stat.
+        # Something else took its place since the stat, or it is over
+        # JAIL_ETC_FILE_MAX.
         return 'not-a-file'
     replaced = data.replace(old.encode(), new.encode())
     if replaced == data:
@@ -744,7 +782,7 @@ def edit_jail_rc_conf(jail_root, name='rc.conf', set_values=None,
     variable to a value: the variable is removed when that is what it is
     set to. The result is 'written', 'unchanged', or 'not-a-file' when
     something other than a plain file is there (a link, a FIFO, a
-    directory), which is left alone.
+    directory), or one over JAIL_ETC_FILE_MAX, which is left alone.
 
     The file belongs to root in the jail, so it is handled as text and
     never as shell. `sysrc -f` sources the file it is given, which ran the
@@ -754,8 +792,8 @@ def edit_jail_rc_conf(jail_root, name='rc.conf', set_values=None,
     read_/write_jail_etc_file; lines that are not touched keep their bytes.
 
     An absent file is created when `create` is true and is a
-    FileNotFoundError otherwise. `etc` that is not a directory raises
-    OSError, as in the helpers.
+    FileNotFoundError otherwise. A root or `etc` that is not a directory
+    raises JailEtcUnreachable, as in the helpers.
     """
     st = _jail_etc_lstat(jail_root, name)
     if st is None:
@@ -770,7 +808,8 @@ def edit_jail_rc_conf(jail_root, name='rc.conf', set_values=None,
     else:
         data = read_jail_etc_file(jail_root, name, binary=True)
         if data is None:
-            # Something else took its place since the stat.
+            # Something else took its place since the stat, or it is over
+            # JAIL_ETC_FILE_MAX.
             return 'not-a-file'
         mode = stat.S_IMODE(st.st_mode)
 
@@ -843,8 +882,8 @@ def checkoutput(*args, **kwargs):
 def set_rcconf(jail_path, key, value):
     """
     Set `key` in the jail's etc/rc.conf. The file is edited as text with
-    edit_jail_rc_conf, never through a link; one that
-    is not a plain file is left alone with a warning.
+    edit_jail_rc_conf, never through a link; one that is not a plain file,
+    or is over JAIL_ETC_FILE_MAX, is left alone with a warning.
     """
     if edit_jail_rc_conf(
         f'{jail_path}/root', 'rc.conf', set_values={key: value}, create=False
@@ -852,7 +891,8 @@ def set_rcconf(jail_path, key, value):
         logit({
             'level': 'WARNING',
             'message': f'{jail_path}/root/etc/rc.conf not updated: it is'
-                       ' not a plain file'
+                       ' not a plain file, or is over'
+                       f' {JAIL_ETC_FILE_MAX >> 20} MiB'
         })
 
 

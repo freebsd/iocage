@@ -22,6 +22,7 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """migrate module for the cli."""
+import contextlib
 import datetime
 import os
 import shutil
@@ -145,13 +146,11 @@ def cli(force, delete):
                         f"{iocroot}/jails/{new_uuid}/fstab")
 
             # never through a link in the jail's etc.
-            try:
+            with contextlib.suppress(ioc_common.JailEtcUnreachable):
                 ioc_common.replace_in_jail_etc_file(
                     f"{iocroot}/jails/{new_uuid}/root", 'rc.conf',
                     f'hostname="{uuid}"', f'hostname="{new_uuid}"'
                 )
-            except OSError:
-                pass
 
             if delete:
                 try:

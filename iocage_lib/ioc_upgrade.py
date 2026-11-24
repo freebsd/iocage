@@ -384,14 +384,23 @@ class IOCUpgrade:
 
         # the file is the jail's. An in-place edit by path read a link
         # there and wrote the linked host file's text into the jail.
-        if iocage_lib.ioc_common.replace_in_jail_etc_file(
-            self.path, 'freebsd-update.conf', text, replace
-        ) in ('absent', 'not-a-file'):
+        try:
+            result = iocage_lib.ioc_common.replace_in_jail_etc_file(
+                self.path, 'freebsd-update.conf', text, replace
+            )
+        except iocage_lib.ioc_common.JailEtcUnreachable as e:
+            result = None
+            reason = f'{e.filename} is {e.strerror}'
+        else:
+            reason = f'{self.path}/etc/freebsd-update.conf is not a plain' \
+                ' file, or is over' \
+                f' {iocage_lib.ioc_common.JAIL_ETC_FILE_MAX >> 20} MiB'
+
+        if result in (None, 'absent', 'not-a-file'):
             iocage_lib.ioc_common.logit(
                 {
                     'level': 'EXCEPTION',
-                    'message': f'{self.path}/etc/freebsd-update.conf is not a'
-                               ' plain file; the jail is not upgraded.'
+                    'message': f'{reason}; the jail is not upgraded.'
                 },
                 _callback=self.callback,
                 silent=self.silent

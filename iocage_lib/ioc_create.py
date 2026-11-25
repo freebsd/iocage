@@ -510,14 +510,7 @@ class IOCCreate(object):
             iocjson.json_write(config)
 
         # Just "touch" the fstab file, since it won't exist and write
-        # /etc/hosts
-        try:
-            etc_hosts_ip_addr = config["ip4_addr"].split("|", 1)[-1].rsplit(
-                '/', 1)[0]
-        except KeyError:
-            # No ip4_addr specified during creation
-            pass
-
+        # /etc/hosts (create_hosts)
         try:
             jail_uuid_short = jail_uuid.rsplit(".")[-2]
             jail_hostname = \
@@ -544,53 +537,9 @@ class IOCCreate(object):
         elif not self.clone:
             open(f"{location}/fstab", "wb").close()
 
-            with open(
-                    f"{self.iocroot}/"
-                    f"{'releases' if not self.template else 'templates'}/"
-                    f"{self.release}/root/etc/hosts", "r"
-            ) as _etc_hosts:
-                with iocage_lib.ioc_common.open_atomic(
-                        f"{location}/root/etc/hosts", "w") as etc_hosts:
-                    # open_atomic will empty the file, we need these still.
-
-                    for line in _etc_hosts.readlines():
-                        if line.startswith("127.0.0.1"):
-                            if config.get(
-                                'assign_localhost'
-                            ) and not config.get('vnet'):
-                                l_ip = config.get('localhost_ip', 'none')
-                                l_ip = l_ip if l_ip != 'none' else \
-                                    iocage_lib.ioc_common.gen_unused_lo_ip()
-                                config['localhost_ip'] = l_ip
-                                iocjson.json_write(config)
-
-                                # If they are creating multiple jails, we want
-                                # this aliased before starting the  jail
-                                su.run(
-                                    [
-                                        'ifconfig', 'lo0', 'alias',
-                                        f'{l_ip}/32'
-                                    ]
-                                )
-
-                                line = f'{l_ip}\t\tlocalhost' \
-                                       ' localhost.my.domain' \
-                                       f' {jail_uuid_short}\n'
-                            else:
-                                line = f'{line.rstrip()} {jail_uuid_short}\n'
-
-                        etc_hosts.write(line)
-                    else:
-                        # We want their IP to have the hostname at the end
-
-                        try:
-                            if config["ip4_addr"] != "none":
-                                final_line =\
-                                    f'{etc_hosts_ip_addr}\t{jail_hostname}\n'
-                                etc_hosts.write(final_line)
-                        except KeyError:
-                            # No ip4_addr specified during creation
-                            pass
+            self.create_hosts(
+                location, config, iocjson, jail_uuid_short, jail_hostname
+            )
         else:
             with open(clone_fstab, "r") as _clone_fstab:
                 with iocage_lib.ioc_common.open_atomic(
@@ -600,13 +549,21 @@ class IOCCreate(object):
                     for line in _clone_fstab.readlines():
                         _fstab.write(line.replace(clone_uuid, jail_uuid))
 
-            with open(clone_etc_hosts, "r") as _clone_etc_hosts:
-                with iocage_lib.ioc_common.open_atomic(
-                        clone_etc_hosts, "w") as etc_hosts:
-                    # open_atomic will empty the file, we need these still.
-
-                    for line in _clone_etc_hosts.readlines():
-                        etc_hosts.write(line.replace(clone_uuid, jail_uuid))
+            # the clone's etc/hosts is its source's; a link there is
+            # neither read nor replaced.
+            try:
+                iocage_lib.ioc_common.replace_in_jail_etc_file(
+                    os.path.dirname(os.path.dirname(clone_etc_hosts)), 'hosts',
+                    clone_uuid, jail_uuid
+                )
+            except iocage_lib.ioc_common.JailEtcUnreachable as e:
+                iocage_lib.ioc_common.logit({
+                    'level': 'WARNING',
+                    'message': f'{clone_etc_hosts} not updated:'
+                               f' {e.filename} is {e.strerror}'
+                },
+                    _callback=self.callback,
+                    silent=self.silent)
 
         if not self.empty:
             self.create_rc(
@@ -1001,6 +958,86 @@ class IOCCreate(object):
         if self.plugin and pkg_err_list:
             return ','.join(pkg_err_list)
 
+    def create_hosts(self, location, config, iocjson, jail_uuid_short,
+                     jail_hostname):
+        """
+        Write the new jail's etc/hosts from its release's or template's.
+
+        A template's root was a jail's, and the new jail's root is a clone of
+        it, so the template's hosts is read, and the new jail's replaced,
+        without following a link in either: open() by path read a linked host
+        file into the new jail. One that is not a plain file, or a root or
+        etc that is not a plain directory, is skipped with a warning.
+        """
+        source_root = f"{self.iocroot}/" \
+            f"{'releases' if not self.template else 'templates'}/" \
+            f"{self.release}/root"
+
+        try:
+            hosts = iocage_lib.ioc_common.read_jail_etc_file(
+                source_root, 'hosts'
+            )
+        except iocage_lib.ioc_common.JailEtcUnreachable as e:
+            hosts = None
+            reason = f'{e.filename} is {e.strerror}'
+        else:
+            reason = f'{source_root}/etc/hosts is not a plain file, or is' \
+                f' over {iocage_lib.ioc_common.JAIL_ETC_FILE_MAX >> 20} MiB'
+
+        if hosts is None:
+            iocage_lib.ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'{location}/root/etc/hosts not written: {reason}'
+            },
+                _callback=self.callback,
+                silent=self.silent)
+
+            return
+
+        lines = []
+
+        for line in hosts.splitlines(keepends=True):
+            if line.startswith("127.0.0.1"):
+                if config.get('assign_localhost') and not config.get('vnet'):
+                    l_ip = config.get('localhost_ip', 'none')
+                    l_ip = l_ip if l_ip != 'none' else \
+                        iocage_lib.ioc_common.gen_unused_lo_ip()
+                    config['localhost_ip'] = l_ip
+                    iocjson.json_write(config)
+
+                    # If they are creating multiple jails, we want
+                    # this aliased before starting the  jail
+                    su.run(['ifconfig', 'lo0', 'alias', f'{l_ip}/32'])
+
+                    line = f'{l_ip}\t\tlocalhost' \
+                           ' localhost.my.domain' \
+                           f' {jail_uuid_short}\n'
+                else:
+                    line = f'{line.rstrip()} {jail_uuid_short}\n'
+
+            lines.append(line)
+
+        # We want their IP to have the hostname at the end
+        ip4_addr = config.get('ip4_addr', 'none')
+
+        if ip4_addr != 'none':
+            etc_hosts_ip_addr = ip4_addr.split('|', 1)[-1].rsplit('/', 1)[0]
+            lines.append(f'{etc_hosts_ip_addr}\t{jail_hostname}\n')
+
+        try:
+            iocage_lib.ioc_common.write_jail_etc_file(
+                f'{location}/root', 'hosts', data=''.join(lines).encode(),
+                mode=0o644
+            )
+        except iocage_lib.ioc_common.JailEtcUnreachable as e:
+            iocage_lib.ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'{location}/root/etc/hosts not written:'
+                           f' {e.filename} is {e.strerror}'
+            },
+                _callback=self.callback,
+                silent=self.silent)
+
     def create_rc(self, location, host_hostname, basejail=0):
         """
         Writes a boilerplate rc.conf file for a jail if it doesn't exist,
@@ -1035,8 +1072,23 @@ ipv6_activate_all_interfaces=\"YES\"
 """
             rc_conf.write_text(rcconf)
 
-        if not jail_rc_conf.is_file():
-            shutil.copy(str(rc_conf), str(jail_rc_conf))
+        # a clone's root is its source's, links and all. The default rc.conf
+        # is written only where there is none, and never through a link.
+        try:
+            if iocage_lib.ioc_common.jail_etc_kind(
+                f'{location}/root', 'rc.conf'
+            ) == 'absent':
+                iocage_lib.ioc_common.write_jail_etc_file(
+                    f'{location}/root', 'rc.conf', data=rc_conf.read_bytes()
+                )
+        except iocage_lib.ioc_common.JailEtcUnreachable as e:
+            iocage_lib.ioc_common.logit({
+                'level': 'WARNING',
+                'message': f'{jail_rc_conf} not written:'
+                           f' {e.filename} is {e.strerror}'
+            },
+                _callback=self.callback,
+                silent=self.silent)
 
         if basejail:
             su.Popen(

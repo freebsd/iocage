@@ -25,10 +25,10 @@
 import datetime
 import hashlib
 import os
+import stat
 import re
 import fcntl
 import itertools
-import shutil
 import json
 import subprocess as su
 import netifaces
@@ -423,17 +423,29 @@ class IOCStart(object):
                     localhost_ip = iocage_lib.ioc_common.gen_unused_lo_ip()
                     self.set(f'localhost_ip={localhost_ip}')
 
-                with open(
-                        f'{self.path}/root/etc/hosts', 'r'
-                ) as _etc_hosts:
-                    with iocage_lib.ioc_common.open_atomic(
-                            f'{self.path}/root/etc/hosts', 'w') as etc_hosts:
-                        # open_atomic will empty the file, we need these still.
-                        for line in _etc_hosts.readlines():
+                # read and replace the jail's hosts
+                # without following a link inside the jail.
+                try:
+                    hosts = iocage_lib.ioc_common.read_jail_etc_file(
+                        f'{self.path}/root', 'hosts'
+                    )
+                    if hosts is None:
+                        self.__etc_not_a_file__('hosts')
+                    else:
+                        lines = []
+                        for line in hosts.splitlines(keepends=True):
                             if line.startswith('127.0.0.1'):
-                                line = line.replace('127.0.0.1', localhost_ip)
+                                line = line.replace(
+                                    '127.0.0.1', localhost_ip
+                                )
 
-                            etc_hosts.write(line)
+                            lines.append(line)
+                        iocage_lib.ioc_common.write_jail_etc_file(
+                            f'{self.path}/root', 'hosts',
+                            data=''.join(lines).encode(), mode=0o644
+                        )
+                except iocage_lib.ioc_common.JailEtcUnreachable as e:
+                    self.__etc_unreachable__('hosts', e)
 
                 if self.check_aliases(localhost_ip, '4') != localhost_ip:
                     su.run(['ifconfig', 'lo0', 'alias', f'{localhost_ip}/32'])
@@ -1370,39 +1382,88 @@ class IOCStart(object):
 
     def start_copy_localtime(self):
         host_time = self.get("host_time")
-        file = f"{self.path}/root/etc/localtime"
 
         if not iocage_lib.ioc_common.check_truthy(host_time):
             return
 
-        if os.path.isfile(file):
-            os.remove(file)
-
+        # the host's /etc/localtime (a link stays a
+        # link, as shutil.copy(follow_symlinks=False) made it) replaces the
+        # jail's without following a link inside the jail.
         try:
-            shutil.copy("/etc/localtime", file, follow_symlinks=False)
+            if os.path.islink('/etc/localtime'):
+                content = {'link': os.readlink('/etc/localtime')}
+            else:
+                with open('/etc/localtime', 'rb') as f:
+                    content = {
+                        'data': f.read(),
+                        'mode': stat.S_IMODE(os.fstat(f.fileno()).st_mode)
+                    }
         except FileNotFoundError:
             return
+
+        self.__jail_etc__(
+            iocage_lib.ioc_common.write_jail_etc_file, 'localtime', **content
+        )
 
     def start_generate_resolv(self):
         resolver = self.get("resolver")
         #                                     compat
 
-        if resolver != "/etc/resolv.conf" and resolver != "none" and \
-                resolver != "/dev/null":
-            with iocage_lib.ioc_common.open_atomic(
-                    f"{self.path}/root/etc/resolv.conf", "w") as resolv_conf:
-
-                for line in resolver.split(";"):
-                    resolv_conf.write(line + "\n")
-        elif resolver == "none":
-            shutil.copy("/etc/resolv.conf",
-                        f"{self.path}/root/etc/resolv.conf")
+        # the jail's resolv.conf is replaced without
+        # following a link inside the jail. Contents and modes are as before:
+        # a custom resolver is written 0644 (open_atomic's mode), a copied
+        # file keeps its source's mode (shutil.copy's).
+        if resolver not in ("/etc/resolv.conf", "none", "/dev/null"):
+            content = {
+                'data': ''.join(
+                    f'{line}\n' for line in resolver.split(";")
+                ).encode(),
+                'mode': 0o644
+            }
         elif resolver == "/dev/null":
             # They don't want the resolv.conf to be touched.
 
             return
         else:
-            shutil.copy(resolver, f"{self.path}/root/etc/resolv.conf")
+            source = "/etc/resolv.conf" if resolver == "none" else resolver
+            with open(source, 'rb') as f:
+                content = {
+                    'data': f.read(),
+                    'mode': stat.S_IMODE(os.fstat(f.fileno()).st_mode)
+                }
+
+        self.__jail_etc__(
+            iocage_lib.ioc_common.write_jail_etc_file, 'resolv.conf',
+            **content
+        )
+
+    def __jail_etc__(self, operation, name, **kwargs):
+        """
+        Run a read_/write_jail_etc_file operation on this jail's etc/<name>.
+        When the jail's root or etc is not a plain directory (a link, say),
+        the step is skipped with a warning and the start goes on;
+        None is returned then.
+        """
+        try:
+            return operation(f'{self.path}/root', name, **kwargs)
+        except iocage_lib.ioc_common.JailEtcUnreachable as e:
+            self.__etc_unreachable__(name, e)
+            return None
+
+    def __etc_unreachable__(self, name, error):
+        iocage_lib.ioc_common.logit({
+            'level': 'WARNING',
+            'message': f'{self.uuid}: etc/{name} not updated:'
+                       f' {error.filename} is {error.strerror}'
+        }, _callback=self.callback, silent=self.silent)
+
+    def __etc_not_a_file__(self, name):
+        iocage_lib.ioc_common.logit({
+            'level': 'WARNING',
+            'message': f'{self.uuid}: etc/{name} not updated: it is not a'
+                       ' plain file, or is over'
+                       f' {iocage_lib.ioc_common.JAIL_ETC_FILE_MAX >> 20} MiB'
+        }, _callback=self.callback, silent=self.silent)
 
     def __generate_mac_bytes(self, nic):
         m = hashlib.md5()
@@ -1457,22 +1518,7 @@ class IOCStart(object):
                 if addr.upper() == check_var:
                     nics.append(nic)
 
-        rc_conf_path = os.path.join(self.path, 'root/etc/rc.conf')
-        if not os.path.exists(rc_conf_path):
-            os.makedirs(os.path.dirname(rc_conf_path), exist_ok=True)
-            open(rc_conf_path, 'w').close()
-            entries = {}
-        else:
-            with open(rc_conf_path, 'r') as f:
-                entries = {
-                    k: v.replace("'", '').replace('"', '')
-                    for k, v in map(
-                        lambda j: [e.strip() for e in j.strip().split('=', 1)],
-                        filter(
-                            lambda j: not j.strip().startswith('#') and '=' in j, f.readlines()
-                        )
-                    )
-                }
+        set_values, remove_if = {}, {}
         for nic in nics:
             if 'vnet' in nic:
                 # Inside jails they are epairNb
@@ -1481,12 +1527,12 @@ class IOCStart(object):
             key = f'ifconfig_{nic}' if ipv4 else f'ifconfig_{nic}_ipv6'
             value = 'SYNCDHCP' if ipv4 else 'inet6 auto_linklocal accept_rtadv autoconf'
             if enable:
-                cmd = [f'{key}={value}']
+                set_values[key] = value
             else:
-                cmd = ['-x', key] if key in entries and entries[key] == value else []
+                remove_if[key] = value
 
-            if cmd:
-                su.run(['sysrc', '-f', rc_conf_path] + cmd, stdout=su.PIPE)
+        # An absent rc.conf is created, as before.
+        self.__edit_rc_conf__(set_values, remove_if)
 
     def __check_rtsold__(self):
         if 'accept_rtadv' not in self.ip6_addr:
@@ -1500,13 +1546,21 @@ class IOCStart(object):
                 silent=self.silent
             )
 
-        su.run(
-            [
-                'sysrc', '-f', f'{self.path}/root/etc/rc.conf',
-                'rtsold_enable=YES'
-            ],
-            stdout=su.PIPE
-        )
+        self.__edit_rc_conf__({'rtsold_enable': 'YES'})
+
+    def __edit_rc_conf__(self, set_values=None, remove_if=None):
+        """
+        Set or remove variables in this jail's etc/rc.conf from the host, as
+        text. The file is the jail's: it is neither sourced (`sysrc -f` did
+        that, as root on the host) nor written through a link.
+        One that is not a plain file, or is over JAIL_ETC_FILE_MAX, is left
+        alone with a warning and the start goes on.
+        """
+        if self.__jail_etc__(
+            iocage_lib.ioc_common.edit_jail_rc_conf, 'rc.conf',
+            set_values=set_values, remove_if=remove_if
+        ) == 'not-a-file':
+            self.__etc_not_a_file__('rc.conf')
 
     def get_default_interface(self):
         if self.host_gateways['ipv4']['interface']:

@@ -22,8 +22,8 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """migrate module for the cli."""
+import contextlib
 import datetime
-import fileinput
 import os
 import shutil
 import subprocess as su
@@ -145,12 +145,12 @@ def cli(force, delete):
             shutil.copy(f"{iocroot}/jails_old/{uuid}/fstab",
                         f"{iocroot}/jails/{new_uuid}/fstab")
 
-            for line in fileinput.input(
-                    f"{iocroot}/jails/{new_uuid}/root/etc/"
-                    "rc.conf", inplace=1):
-                print(
-                    line.replace(f'hostname="{uuid}"',
-                                 f'hostname="{new_uuid}"').rstrip())
+            # never through a link in the jail's etc.
+            with contextlib.suppress(ioc_common.JailEtcUnreachable):
+                ioc_common.replace_in_jail_etc_file(
+                    f"{iocroot}/jails/{new_uuid}/root", 'rc.conf',
+                    f'hostname="{uuid}"', f'hostname="{new_uuid}"'
+                )
 
             if delete:
                 try:

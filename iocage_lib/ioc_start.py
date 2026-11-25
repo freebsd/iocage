@@ -183,9 +183,7 @@ class IOCStart(object):
         self.host_gateways = iocage_lib.ioc_common.get_host_gateways(self.exec_fib)
 
         fstab_list = []
-        with open(
-                f'{self.iocroot}/jails/{self.jail_uuid}/fstab', 'r'
-        ) as _fstab:
+        with open(f'{self.path}/fstab', 'r') as _fstab:
             for line in _fstab.readlines():
                 line = line.rsplit("#")[0].rstrip()
                 fstab_list.append(line)

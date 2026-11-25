@@ -102,12 +102,24 @@ def test_11_subset_of_cpus_in_range():
 
 # Tests for point 3 and 4
 def test_12_off_value():
-    assert IOCCpuset.validate_cpuset_prop('off', False) is False
+    with patch(
+        'iocage_lib.ioc_json.IOCCpuset.retrieve_cpu_sets',
+        Mock(return_value=6)
+    ):
+        assert IOCCpuset.validate_cpuset_prop('off', False) is False
 
 
 def test_13_all_value():
-    assert IOCCpuset.validate_cpuset_prop('all', False) is False
+    with patch(
+        'iocage_lib.ioc_json.IOCCpuset.retrieve_cpu_sets',
+        Mock(return_value=6)
+    ):
+        assert IOCCpuset.validate_cpuset_prop('all', False) is False
 
 
 def test_14_invalid_value_not_allowed():
-    assert IOCCpuset.validate_cpuset_prop('gibberish', False) is True
+    with patch(
+        'iocage_lib.ioc_json.IOCCpuset.retrieve_cpu_sets',
+        Mock(return_value=6)
+    ):
+        assert IOCCpuset.validate_cpuset_prop('gibberish', False) is True

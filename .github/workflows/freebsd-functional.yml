@@ -1,0 +1,53 @@
+name: FreeBSD functional tests
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  functional:
+    name: FreeBSD ${{ matrix.release }} functional tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["14.5", "15.1"]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Run the jail lifecycle suite in a disposable FreeBSD VM
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
+        with:
+          release: ${{ matrix.release }}
+          # Keep the JUnit report on the runner even when pytest exits nonzero.
+          sync: sshfs
+          prepare: |
+            set -eu
+            pkg install -y git python3
+            py=$(python3 -c 'import sys; print("py%d%d" % sys.version_info[:2])')
+            pkg install -y "$py-libzfs" "$py-netifaces" "$py-jsonschema" "$py-pip" "$py-pytest"
+          run: |
+            set -eu
+            # Read pkg's libzfs bindings while installing iocage into the venv.
+            python3 -m venv --system-site-packages --without-pip /tmp/iocage-venv
+            export PATH="/tmp/iocage-venv/bin:$PATH"
+            /tmp/iocage-venv/bin/python -m pip install .
+            python -c 'import libzfs'
+
+            truncate -s 20G /var/tmp/iocage-pool.img
+            zpool create -O compression=lz4 pool /var/tmp/iocage-pool.img
+            mount -t fdescfs fdesc /dev/fd
+
+            mkdir -p reports
+            python -m pytest tests/functional_tests -o addopts= -v -ra \
+              --zpool=pool --release=${{ matrix.release }}-RELEASE --image \
+              --server=https://download.freebsd.org --junitxml=reports/functional.xml
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: freebsd-${{ matrix.release }}-functional-results
+          path: reports/functional.xml
+          if-no-files-found: error

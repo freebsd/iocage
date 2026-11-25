@@ -928,19 +928,16 @@ def consume_and_log(exec_gen, log=True, callback=None):
 
 def get_jail_freebsd_version(path, release):
     """Checks the current patch level for the jail"""
-    if release[:4].endswith('-'):
-        # 9.3-RELEASE and under don't actually have this binary
-        new_release = release
-    else:
-        with open(
-            f'{path}/bin/freebsd-version', mode='r', encoding='utf-8'
-        ) as r:
-            for line in r:
-                if line.startswith('USERLAND_VERSION'):
-                    new_release = line.rstrip().partition('=')[
-                        2].strip('"')
+    with open(
+        f'{path}/bin/freebsd-version', mode='r', encoding='utf-8'
+    ) as version_file:
+        for line in version_file:
+            if line.startswith('USERLAND_VERSION='):
+                return line.rstrip().partition('=')[2].strip('"')
 
-    return new_release
+    raise ValueError(
+        f'USERLAND_VERSION not found in {path}/bin/freebsd-version'
+    )
 
 
 def truthy_values():

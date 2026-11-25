@@ -313,7 +313,16 @@ class IOCPlugin(object):
             conf['release'] = re.sub(r"\W\w.", "-", conf['release'])
 
         self.release = conf['release']
-        props, pkg = self.__fetch_plugin_props__(conf, props, num)
+        # Report malformed version data from either the initial read or retry.
+        try:
+            props, pkg = self.__fetch_plugin_props__(conf, props, num)
+        except ValueError as error:
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': str(error)
+            },
+                _callback=self.callback,
+                silent=self.silent)
         self.__fetch_plugin_inform__(conf, num, plugins, accept_license)
         location = f"{self.iocroot}/jails/{self.jail}"
 
@@ -460,8 +469,7 @@ class IOCPlugin(object):
         """Generates the list of properties that a user and the JSON supply"""
         self.release = conf["release"]
         pkg_repos = conf["fingerprints"]
-        freebsd_version = f"{self.iocroot}/releases/{conf['release']}" \
-            "/root/bin/freebsd-version"
+        release_root = f"{self.iocroot}/releases/{conf['release']}/root"
         json_props = conf.get("properties", {})
         truthy_inverse = iocage_lib.ioc_common.truthy_inverse_values()
         props = {p.split('=')[0]: p.split('=')[1] for p in list(props)}
@@ -496,41 +504,27 @@ class IOCPlugin(object):
                     self.release, self.callback, self.silent, major_only=True)
                 self.__fetch_release__(self.release)
 
-        if conf["release"][:4].endswith("-"):
-            # 9.3-RELEASE and under don't actually have this binary.
-            release = conf["release"]
-        else:
-            iocage_lib.ioc_common.check_release_newer(
-                self.release, self.callback, self.silent, major_only=True)
+        iocage_lib.ioc_common.check_release_newer(
+            self.release, self.callback, self.silent, major_only=True)
 
-            try:
-                with open(
-                    freebsd_version, mode='r', encoding='utf-8'
-                ) as r:
-                    for line in r:
-                        if line.startswith("USERLAND_VERSION"):
-                            release = line.rstrip().partition("=")[2].strip(
-                                '"')
-            except FileNotFoundError:
-                iocage_lib.ioc_common.logit(
-                    {
-                        "level": "WARNING",
-                        "message": f"Release {self.release} missing, "
-                        f"will attempt to fetch it."
-                    },
-                    _callback=self.callback,
-                    silent=self.silent)
+        try:
+            release = iocage_lib.ioc_common.get_jail_freebsd_version(
+                release_root, self.release
+            )
+        except FileNotFoundError:
+            iocage_lib.ioc_common.logit(
+                {
+                    "level": "WARNING",
+                    "message": f"Release {self.release} missing, "
+                    f"will attempt to fetch it."
+                },
+                _callback=self.callback,
+                silent=self.silent)
 
-                self.__fetch_release__(self.release)
-
-                # We still want this.
-                with open(
-                    freebsd_version, mode='r', encoding='utf-8'
-                ) as r:
-                    for line in r:
-                        if line.startswith("USERLAND_VERSION"):
-                            release = line.rstrip().partition("=")[2].strip(
-                                '"')
+            self.__fetch_release__(self.release)
+            release = iocage_lib.ioc_common.get_jail_freebsd_version(
+                release_root, self.release
+            )
 
         # We set our properties that we need, and then iterate over the user
         # supplied properties replacing ours.

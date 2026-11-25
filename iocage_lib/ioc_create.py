@@ -163,11 +163,19 @@ class IOCCreate(object):
                     rel_path = f"{self.iocroot}/{_type}/{self.release}"
 
                     if not self.empty:
-                        cloned_release = \
-                            iocage_lib.ioc_common.get_jail_freebsd_version(
-                                f'{rel_path}/root',
-                                self.release
-                            )
+                        try:
+                            cloned_release = \
+                                iocage_lib.ioc_common.get_jail_freebsd_version(
+                                    f'{rel_path}/root',
+                                    self.release
+                                )
+                        except ValueError as error:
+                            iocage_lib.ioc_common.logit({
+                                'level': 'EXCEPTION',
+                                'message': str(error)
+                            },
+                                _callback=self.callback,
+                                silent=self.silent)
                     else:
                         cloned_release = "EMPTY"
             except (IOError, OSError, FileNotFoundError, UnboundLocalError):

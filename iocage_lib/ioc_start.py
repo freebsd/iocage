@@ -98,7 +98,6 @@ class IOCStart(object):
         will be copied into the jail.
         """
         status, _ = iocage_lib.ioc_list.IOCList().list_get_jid(self.uuid)
-        userland_version = float(os.uname()[2].partition("-")[0])
 
         # If the jail is not running, let's do this thing.
 
@@ -333,46 +332,17 @@ class IOCStart(object):
                     raise RuntimeError(
                         f"{err.output.decode('utf-8').rstrip()}")
 
-        # FreeBSD 9.3 and under do not support this.
-
-        if userland_version <= 9.3:
-            tmpfs = ""
-            fdescfs = ""
-            _allow_mount_fdescfs = ""
-        else:
-            tmpfs = f"allow.mount.tmpfs={allow_mount_tmpfs}"
-            fdescfs = f"mount.fdescfs={mount_fdescfs}"
-            _allow_mount_fdescfs = f"allow.mount.fdescfs={allow_mount_fdescfs}"
-
-        # FreeBSD 10.3 and under do not support this.
-
-        if userland_version <= 10.3:
-            _sysvmsg = ""
-            _sysvsem = ""
-            _sysvshm = ""
-        else:
-            _sysvmsg = f"sysvmsg={sysvmsg}"
-            _sysvsem = f"sysvsem={sysvsem}"
-            _sysvshm = f"sysvshm={sysvshm}"
-
-        # FreeBSD before 12.0 does not support this.
-
-        if userland_version < 12.0:
-            _allow_mlock = ''
-            _allow_mount_fusefs = ''
-            _allow_vmm = ''
-            _exec_created = ''
-        else:
-            _allow_mlock = f"allow.mlock={allow_mlock}"
-            _allow_mount_fusefs = f"allow.mount.fusefs={allow_mount_fusefs}"
-            _allow_vmm = f"allow.vmm={allow_vmm}"
-            _exec_created = f'exec.created={exec_created}'
-
-        # FreeBSD < 13.3 does not support nfsd in jail
-        if userland_version < 13.3:
-            _allow_nfsd = ''
-        else:
-            _allow_nfsd = f"allow.nfsd={allow_nfsd}"
+        tmpfs = f"allow.mount.tmpfs={allow_mount_tmpfs}"
+        fdescfs = f"mount.fdescfs={mount_fdescfs}"
+        _allow_mount_fdescfs = f"allow.mount.fdescfs={allow_mount_fdescfs}"
+        _sysvmsg = f"sysvmsg={sysvmsg}"
+        _sysvsem = f"sysvsem={sysvsem}"
+        _sysvshm = f"sysvshm={sysvshm}"
+        _allow_mlock = f"allow.mlock={allow_mlock}"
+        _allow_mount_fusefs = f"allow.mount.fusefs={allow_mount_fusefs}"
+        _allow_vmm = f"allow.vmm={allow_vmm}"
+        _exec_created = f'exec.created={exec_created}'
+        _allow_nfsd = f"allow.nfsd={allow_nfsd}"
 
         if nat:
             self.log.debug(f'Checking NAT backend: {nat_backend}')

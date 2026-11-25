@@ -1,0 +1,325 @@
+"""Console login should prepare its configuration and running state once."""
+
+import subprocess
+import sys
+import textwrap
+
+from pathlib import Path
+from unittest import mock
+
+import pytest
+
+from iocage_lib import ioc_common, ioc_exec, ioc_json, iocage
+from iocage_lib.ioc_json import IOCJson
+
+
+def run_cli_script(arguments, script):
+    """Isolate CLI imports, which replace streams and signal handlers."""
+    setup = '''
+import locale
+import subprocess
+import sys
+
+from contextlib import ExitStack
+from unittest.mock import patch
+
+import click
+
+from click.testing import CliRunner
+arguments = sys.argv[1:]
+sys.argv = ['iocage', *arguments]
+with ExitStack() as stack:
+    stack.enter_context(patch.object(locale, 'setlocale'))
+    stack.enter_context(patch.object(subprocess, 'check_call'))
+    import iocage_cli
+with ExitStack() as stack:
+    stack.enter_context(patch.object(iocage_cli, 'IOCLogger'))
+    stack.enter_context(patch.object(iocage_cli.os, 'geteuid', return_value=0))
+    check = stack.enter_context(patch('iocage_cli.ioc_check.IOCCheck'))
+    jail = stack.enter_context(patch('iocage_lib.iocage.IOCage'))
+'''
+    subprocess.run(
+        [sys.executable, '-c',
+         setup + textwrap.indent(textwrap.dedent(script), '    '), *arguments],
+        check=True
+    )
+
+
+@pytest.fixture
+def console(tmp_path, monkeypatch):
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', False)
+    conf = {'login_flags': '-f root', 'exec_fib': '0', 'type': 'jail'}
+    with mock.patch.object(ioc_json, 'IOCJson') as json_class:
+        json_class.return_value.pool = 'tank'
+        json_class.return_value.iocroot = str(tmp_path)
+        json_class.return_value.json_get_value.return_value = conf
+        jail = iocage.IOCage(jail='dev', silent=True, skip_jails=True)
+        (tmp_path / 'jails' / 'dev').mkdir(parents=True)
+        json_class.reset_mock()
+        with mock.patch.object(jail, 'get', side_effect=AssertionError), \
+                mock.patch.object(jail, 'start') as start, \
+                mock.patch.object(iocage.ioc_list.IOCList, '__init__',
+                                  side_effect=AssertionError), \
+                mock.patch.object(iocage.ioc_list.IOCList, 'list_get_jid',
+                                  return_value=(True, '6')) as status, \
+                mock.patch.object(ioc_exec.su, 'run') as run, \
+                mock.patch.object(ioc_exec.iocage_lib.ioc_start,
+                                  'IOCStart') as auto_start:
+            yield jail, json_class, conf, status, start, run, auto_start
+
+
+@pytest.mark.parametrize('name', ['dev', 'dev.example'])
+@pytest.mark.parametrize('flags,fib', [('-f root', '0'), ('-f alice', '2')])
+def test_running_console_context(console, name, flags, fib):
+    jail, json_class, conf, status, start, run, auto_start = console
+    jail.jail = name
+    path = f'{jail.iocroot}/jails/{name}'
+    if name != 'dev':
+        Path(path).mkdir()
+    conf.update(login_flags=flags, exec_fib=fib)
+    with mock.patch.object(jail, 'list', side_effect=AssertionError):
+        jail.exec(None, console=True)
+    status.assert_called_once_with(name)
+    json_class.assert_called_once_with(path)
+    json_class.return_value.json_get_value.assert_called_once_with('all')
+    command = [
+        '/usr/sbin/setfib', fib, 'jexec', '-u', 'root',
+        f'ioc-{name.replace(".", "_")}', 'login', '-p', *flags.split()
+    ]
+    assert run.call_args.args == (command,)
+    assert run.call_args.kwargs['check'] is True
+    assert run.call_args.kwargs['env']['TERM'] == 'xterm-256color'
+    assert run.call_args.kwargs['env']['HOME'] == '/'
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+def test_console_uses_inherited_configuration(console):
+    jail, json_class, _, _, _, run, _ = console
+    # Exercise the real defaults merge, without involving host ZFS state.
+    config = json_class.return_value
+    config.json_get_value.side_effect = lambda prop: \
+        IOCJson.get_full_config(config)
+    config.default_config = {'login_flags': '-f root', 'exec_fib': '1'}
+    config.json_load.return_value = ({'exec_fib': '3'}, False)
+    config.fix_properties.return_value = False
+    config.truthy_props = IOCJson.truthy_props
+    jail.exec(None, console=True)
+    assert run.call_args.args[0] == [
+        '/usr/sbin/setfib', '3', 'jexec', '-u', 'root', 'ioc-dev',
+        'login', '-p', '-f', 'root'
+    ]
+
+
+@pytest.mark.parametrize('interactive', [False, True])
+def test_stopped_console_requires_force(console, monkeypatch, interactive):
+    jail, _, _, status, start, run, auto_start = console
+    status.return_value = (False, '-')
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', interactive)
+    exception = SystemExit if interactive else RuntimeError
+    with pytest.raises(exception):
+        jail.exec(None, console=True)
+    status.assert_called_once()
+    start.assert_not_called()
+    auto_start.assert_not_called()
+    run.assert_not_called()
+
+
+def test_force_starts_once_and_refreshes_context(console):
+    jail, json_class, conf, status, start, run, auto_start = console
+    status.side_effect = [(False, '-'), (True, '7')]
+    json_class.return_value.json_get_value.side_effect = [
+        conf, dict(conf, exec_fib='2', login_flags='-f alice')
+    ]
+    jail.exec(None, console=True, start_jail=True)
+    start.assert_called_once_with()
+    assert status.call_count == 2
+    assert json_class.call_count == 2
+    assert run.call_args.args[0][1] == '2'
+    assert run.call_args.args[0][-1] == 'alice'
+    auto_start.assert_not_called()
+
+
+def test_failed_start_does_not_launch_or_restart(console):
+    jail, _, _, status, start, run, auto_start = console
+    status.return_value = (False, '-')
+    with pytest.raises(RuntimeError, match='not running'):
+        jail.exec(None, console=True, start_jail=True)
+    start.assert_called_once()
+    auto_start.assert_not_called()
+    run.assert_not_called()
+
+
+def test_disappearing_jail_is_not_restarted(console, caplog):
+    jail, _, _, status, start, run, auto_start = console
+    run.side_effect = subprocess.CalledProcessError(1, 'jexec')
+    with pytest.raises(ioc_exec.iocage_lib.ioc_exceptions.CommandFailed):
+        jail.exec(None, console=True)
+    status.assert_called_once()
+    assert 'Console failed!' in caplog.text
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+@pytest.mark.parametrize('interactive', [False, True])
+@pytest.mark.parametrize('error', [
+    KeyboardInterrupt(), SystemExit(0), SystemExit(7)
+])
+def test_console_control_exceptions_do_not_log_failure(
+    console, monkeypatch, caplog, interactive, error
+):
+    jail, _, _, _, start, run, auto_start = console
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', interactive)
+    run.side_effect = error
+
+    with pytest.raises(type(error)) as caught:
+        jail.exec(None, console=True)
+
+    assert caught.value is error
+    assert 'Console failed!' not in caplog.text
+    run.assert_called_once()
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+@pytest.mark.parametrize('interactive', [False, True])
+@pytest.mark.parametrize('error', [
+    RuntimeError('console failed'), PermissionError('access denied')
+])
+def test_console_runtime_errors_still_log_failure(
+    console, monkeypatch, caplog, interactive, error
+):
+    jail, _, _, _, start, run, auto_start = console
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', interactive)
+    run.side_effect = error
+
+    with pytest.raises(type(error)) as caught:
+        jail.exec(None, console=True)
+
+    assert caught.value is error
+    assert 'Console failed!' in caplog.text
+    run.assert_called_once()
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+def test_cli_console_command_error_is_not_reported_twice(
+    console, monkeypatch, caplog
+):
+    jail, _, _, _, start, run, auto_start = console
+    # The executor logs this command failure before raising SystemExit.
+    monkeypatch.setattr(ioc_common, 'INTERACTIVE', True)
+    run.side_effect = subprocess.CalledProcessError(1, 'jexec')
+
+    with pytest.raises(SystemExit) as caught:
+        jail.exec(None, console=True)
+
+    assert caught.value.code == 1
+    assert caplog.messages == ['Command: login -p -f root failed!']
+    run.assert_called_once()
+    start.assert_not_called()
+    auto_start.assert_not_called()
+
+
+@pytest.mark.parametrize('error', [
+    ioc_exec.iocage_lib.ioc_exceptions.JailCorruptConfiguration,
+    ioc_exec.iocage_lib.ioc_exceptions.JailMissingConfiguration
+])
+def test_configuration_failure_prevents_console(console, error):
+    jail, json_class, _, status, _, run, _ = console
+    json_class.return_value.json_get_value.side_effect = error('bad config')
+    with pytest.raises(error):
+        jail.exec(None, console=True)
+    status.assert_not_called()
+    run.assert_not_called()
+
+
+@pytest.mark.parametrize('matches', [[], ['dev'], ['dev', 'dev.two']])
+def test_prefix_resolution(console, matches):
+    jail, _, _, status, _, run, _ = console
+    jail.jail = 'de'
+    mapping = {name: f'{jail.iocroot}/jails/{name}' for name in matches}
+    with mock.patch.object(jail, 'list', return_value=mapping) as listing:
+        if len(matches) == 1:
+            jail.exec(None, console=True)
+            status.assert_called_once_with('dev')
+        else:
+            message = 'Multiple jails' if matches else 'not found'
+            with pytest.raises(RuntimeError, match=message):
+                jail.exec(None, console=True)
+            run.assert_not_called()
+        listing.assert_called_once_with('uuid')
+
+
+def test_default_prefix_resolution_keeps_existing_listing(console):
+    jail, _, _, _, _, _, _ = console
+    jail.jail = 'de'
+    path = f'{jail.iocroot}/jails/dev'
+    with mock.patch.object(jail, 'list', return_value={'dev': path}) as ls:
+        assert jail.__check_jail_existence__() == ('dev', path)
+    ls.assert_called_once_with('uuid')
+
+
+@pytest.mark.parametrize('name', ['SMALL', 'ALLigator', 'myALLjail'])
+def test_all_substring_is_a_single_console_target(console, name):
+    original, _, _, status, _, run, auto_start = console
+    Path(original.iocroot, 'jails', name).mkdir()
+    jail = iocage.IOCage(jail=name, silent=True, skip_jails=True)
+    with mock.patch.object(jail, 'list', side_effect=AssertionError):
+        jail.exec(None, console=True)
+    status.assert_called_once_with(name)
+    run.assert_called_once()
+    assert run.call_args.args[0][5] == f'ioc-{name}'
+    auto_start.assert_not_called()
+
+
+def test_console_all_keeps_bulk_execution(console):
+    original, _, _, status, _, run, auto_start = console
+    Path(original.iocroot, 'jails', 'other').mkdir()
+    paths = {name: f'{original.iocroot}/jails/{name}'
+             for name in ('dev', 'other')}
+    with mock.patch.object(iocage.IOCage, 'list',
+                           return_value=paths) as listing:
+        jail = iocage.IOCage(jail='ALL', silent=True)
+        jail.exec(None, console=True)
+    listing.assert_called_once_with('uuid')
+    assert status.call_args_list == [mock.call('dev'), mock.call('other')]
+    assert [call.args[0][5] for call in run.call_args_list] == [
+        'ioc-dev', 'ioc-other'
+    ]
+    auto_start.assert_not_called()
+
+
+def test_executor_defaults_still_resolve_context():
+    conf = {'exec_fib': '0', 'type': 'jail'}
+    with mock.patch.object(ioc_exec.iocage_lib.ioc_list, 'IOCList') as ls, \
+            mock.patch.object(ioc_json, 'IOCJson') as js:
+        ls.return_value.list_get_jid.return_value = (True, '6')
+        js.return_value.json_get_value.return_value = conf
+        executor = ioc_exec.IOCExec(['true'], '/iocage/jails/dev', uuid='dev')
+        ls.return_value.list_get_jid.assert_called_once_with('dev')
+        js.return_value.json_get_value.assert_called_once_with('all')
+        assert executor.cmd[-1] == 'true'
+
+
+@pytest.mark.parametrize('name', [
+    'dev', 'ALL', 'SMALL', 'ALLigator', 'myALLjail'
+])
+def test_console_cli_refreshes_cache_and_skips_jail_listing(name):
+    run_cli_script(['console', name], '''
+result = CliRunner().invoke(iocage_cli.cli, arguments)
+assert result.exit_code == 0, result.output
+check.assert_called_once_with(reset_cache=True)
+assert jail.call_args.kwargs['skip_jails'] == (arguments[1] != 'ALL')
+''')
+
+
+def test_other_cli_commands_keep_uncached_checks():
+    run_cli_script(['list'], '''
+command = click.Command('list', callback=lambda: None)
+stack.enter_context(patch.object(iocage_cli.IOCageCLI, 'get_command',
+                                return_value=command))
+result = CliRunner().invoke(iocage_cli.cli, arguments)
+assert result.exit_code == 0, result.output
+check.assert_called_once_with(reset_cache=False)
+''')

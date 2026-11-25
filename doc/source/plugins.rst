@@ -38,7 +38,7 @@ To get started, open a command line and type
 :command:`iocage fetch --plugins ip4_addr="IF|IP"`. This initial
 :command:`fetch` also supports *dhcp* in the same manner as
 :command:`iocage create`. The IP listed for the plugin needs to
-be a valid IP not already in use. Use the *- -name* flag to easily fetch a
+be a valid IP not already in use. Use the *--name* flag to easily fetch a
 specific plugin:
 
 :samp:`$ iocage fetch --plugins --name plexmediaserver ip4_addr="igb0|192.168.0.91"`
@@ -51,7 +51,7 @@ If available, plugins can also be fetched locally with
    testing an in-development plugin.
 
 
-After fetching a plugin, view of all its properties with
+After fetching a plugin, view all its properties with
 :command:`iocage get -a NAME|UUID | less`. Individual properties are
 found with :command:`iocage get PROPERTY`:
 
@@ -90,7 +90,7 @@ Following is an example of a plugin manifest:
 
     {
         "name": "default_jail_name_here",
-        "release": "11.3-RELEASE",
+        "release": "15.1-RELEASE",
         "artifact": "https://github.com/git_path_to_plugin_repo",
         "official": false,
         "properties": {

@@ -1,4 +1,4 @@
-.. index:: Advance Usage
+.. index:: Advanced Usage
 .. _Advanced Usage:
 
 Advanced Usage
@@ -83,7 +83,7 @@ To clone a jail, run:
 :command:`iocage clone [UUID|NAME] --name [testupdate]`
 
 .. note:: The **[-n | --name]** flag is optional. :command:`iocage`
-   assigns an UUID to the jail if **[-n | --name]** is not used.
+   assigns a UUID to the jail if **[-n | --name]** is not used.
 
 .. index:: Upgrade Jails
 .. _Upgrading Jails:
@@ -94,16 +94,16 @@ Upgrading Jails
 Upgrades are handled with the freebsd-update(8) utility. By default, the
 user must supply the new RELEASE for the jail's upgrade. For example:
 
-:samp:`# iocage upgrade examplejail -r 11.0-RELEASE`
+:samp:`# iocage upgrade examplejail -r 15.1-RELEASE`
 
-Tells jail *examplejail* to upgrade its RELEASE to *11.0-RELEASE*.
+Tells jail *examplejail* to upgrade its RELEASE to *15.1-RELEASE*.
 
 .. note:: It is recommended to keep the iocage host and jails RELEASE
    synchronized.
 
 To upgrade a jail to the host's RELEASE, run:
 
-:command:`iocage upgrade -r [11.1-RELEASE] [UUID | NAME]`
+:command:`iocage upgrade -r [15.1-RELEASE] [UUID | NAME]`
 
 This upgrades the jail to the same RELEASE as the host. This method also
 applies to basejails.
@@ -185,94 +185,74 @@ Delete all snapshots from a jail (requires `-f / --force`):
 .. index:: Resource Limits
 .. _Resource Limits:
 
-Resource Limits (Legacy ONLY)
------------------------------
+Resource Limits
+---------------
 
-.. warning:: This functionality is only available for legacy versions of
-   :command:`iocage`. It is not yet implemented in the current version.
-   This applies to all subsections of *Resource Limits*.
+iocage supports CPU affinity through ``cpuset`` and resource limits through
+FreeBSD's ``rctl(8)``. CPU affinity does not require resource accounting.
 
-:command:`iocage` can enable optional resource limits for a jail. The
-outlined procedure here is meant to provide a starting point for the
-user.
+Supported FreeBSD GENERIC kernels include ``options RACCT`` and
+``options RCTL``; custom kernels must retain both to use resource limits.
+To enable resource accounting, add this line to ``/boot/loader.conf`` and
+reboot the host, unless accounting is already enabled:
 
-.. index:: Limit Cores or Threads
-.. _Limit Cores or Threads:
+.. code-block:: none
 
-Limit Cores or Threads
-++++++++++++++++++++++
+   kern.racct.enable="1"
 
-Limit a jail to a single thread or core #1:
+Verify that resource accounting is enabled; this must print ``1``:
 
-:command:`iocage set cpuset=1 [UUID|TAG]`
-:command:`iocage start [UUID|TAG]`
+:samp:`# sysctl -n kern.racct.enable`
 
-.. index:: List Applied Rules
-.. _List Applied Rules:
+Display the host's available logical CPU IDs:
 
-List Applied Limits
-+++++++++++++++++++
+:samp:`# cpuset -g -s 0`
 
-List applied limits:
+Restrict a jail to logical CPU 1, if that CPU is available:
 
-:command:`iocage limits [UUID|TAG]`
+:samp:`# iocage set cpuset=1 examplejail`
 
-.. index:: Limit DRAM Usage
-.. _Limit DRAM Usage:
+CPU IDs start at 0. CPU affinity changes take effect when the jail starts
+or is fully restarted with :command:`iocage restart examplejail`; they do
+not reserve CPUs exclusively for the jail.
 
-Limit DRAM use
-++++++++++++++
+Limit the jail's aggregate resident memory to 4 GiB:
 
-This example limits a jail to using 4 Gb DRAM memory (limiting RSS
-memory use can be done on-the-fly):
+:samp:`# iocage set memoryuse=deny=4G examplejail`
 
-:samp:`# iocage set memoryuse=4G:deny examplejail`
+.. warning:: FreeBSD's ``rctl(8)`` manual warns that limiting ``memoryuse``
+   can cause thrashing severe enough to make the host unresponsive. This
+   limits resident memory; ``vmemoryuse`` limits virtual address space and
+   ``swapuse`` limits swap reservations and usage.
 
-.. index:: Turn on Resource Limits
-.. _Turn on Resource Limits:
+Limit the jail's aggregate CPU use to 20% of one CPU's capacity:
 
-Turn on Resource Limits
-+++++++++++++++++++++++
+:samp:`# iocage set pcpu=deny=20 examplejail`
 
-Turn on resource limiting for a jail with:
+For ``pcpu``, 100 represents one CPU's capacity, and 200 represents two CPUs'
+capacity. FreeBSD enforces ``pcpu`` limits with the ``deny`` action;
+``throttle`` is supported only for the I/O resources ``readbps``, ``writebps``,
+``readiops``, and ``writeiops``.
 
-:command:`iocage set rlimits=on [UUID|TAG]`
+Resource limit properties use ``action=amount`` values. iocage creates rules
+accounted for across the jail. Setting a supported limit on a running jail
+attempts to apply it immediately; check the command's result and active rules
+to confirm success. Configured limits also apply at startup. To remove a
+limit, set its property to ``off``:
 
-.. index:: Apply Limits
-.. _Apply Limits:
+:samp:`# iocage set memoryuse=off examplejail`
 
-Apply limits
-++++++++++++
+For a running jail, display its active rules and current resource usage from
+the host:
 
-Apply limits to a running jail with:
+:samp:`# rctl jail:ioc-examplejail`
 
-:command:`iocage cap [UUID | TAG]`
+:samp:`# rctl -hu jail:ioc-examplejail`
 
-.. index:: Check Limits
-.. _Check Limits:
-
-Check Limits
-++++++++++++
-
-Check the currently active limits on a jail with:
-
-:command:`iocage limits [UUID | TAG]`
-
-.. index:: Limit CPU Usage by Percentage
-.. _Limit CPU Usage by Percentage:
-
-Limit CPU Usage by %
-++++++++++++++++++++
-
-In this example, :command:`iocage` limits *testjail* CPU execution to
-20%, then applies the limitation to the active jail:
-
-:samp:`# iocage set pcpu=20:deny testjail`
-:samp:`# iocage cap testjail`
-
-Double check the jail's current limits to confirm the functionality:
-
-:samp:`# iocage limits testjail`
+Use the actual jail name reported by ``jls -n name`` in the ``jail:`` filter.
+See the `FreeBSD rctl(8) manual
+<https://man.freebsd.org/cgi/man.cgi?query=rctl&sektion=8>`_
+for supported resources, actions, and units.
 
 .. index:: Automatic Package Installation
 .. _Automatic Package Installation:
@@ -307,6 +287,6 @@ Now, create a jail and supply :file:`pkgs.json`:
 :command:`iocage create -r [RELEASE] -p [path-to/pkgs.json] -n [NAME]`
 
 .. note:: The **[-n | --name]** flag is optional. :command:`iocage`
-   assigns an UUID to the jail if **[-n | --name]** is not used.
+   assigns a UUID to the jail if **[-n | --name]** is not used.
 
 This installs **nginx** and **tmux** in the newly created jail.

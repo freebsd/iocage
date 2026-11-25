@@ -1,4 +1,4 @@
-.Dd June 16, 2026
+.Dd October 6, 2026
 .Dt IOCAGE 8
 .Os
 .Sh NAME
@@ -265,14 +265,22 @@ are required for VNET and can be enabled by adding this line to
 cloned_interfaces="bridge0 bridge1"
 .Ed
 .Pp
-To enable all the features
-.Nm
-supports, consider building a kernel with these options:
+Supported
+.Fx
+GENERIC kernels include the following options.
+Custom kernels must retain them to use VNET and resource limits:
 .Bd -literal -offset indent
 options         VIMAGE
 options         RACCT
 options         RCTL
 .Ed
+.Pp
+RCTL resource limits also require
+.Ql kern.racct.enable=1
+in
+.Pa /boot/loader.conf
+and a host reboot, unless resource accounting is already enabled.
+CPU affinity does not require resource accounting.
 .Sh SUBCOMMANDS
 .Bl -tag -width ".Cm activate"
 .\" == Debug ==
@@ -407,7 +415,7 @@ package in the newly created jail.
 .It Op Fl r | -release Ar TEXT
 Specify which RELEASE to use for the new jail.
 .It Op Fl r | -release Cm latest | Cm LATEST
-Creat a new jail with the latest release available.
+Create a new jail with the latest release available.
 .It Op Fl s | -short
 Use a short UUID of 8 characters instead of the default 36.
 .It Op Fl t | -template Ar TEXT
@@ -441,7 +449,7 @@ Create a
 This command creates three identical jails based off the
 .Fx
 15.1 RELEASE.
-These jails are sequentially numbered  based on the
+These jails are sequentially numbered based on the
 custom NAME.
 .\" == DESTROY ==
 .It Cm destroy
@@ -567,7 +575,7 @@ outside the jail on the primary system.
 Exports the specified jail.
 An archive file is created in
 .Pa /iocage/images
-with an SHA256 checksum.
+with a SHA256 checksum.
 The jail must be stopped before exporting.
 .Pp
 Example:
@@ -621,7 +629,7 @@ Specify the root directory containing all RELEASE files.
 .It Op Fl f | -file
 Use a local file directory for the root directory instead of HTTP.
 .It Op Fl h | -http
-No-op flag for backwords compatibility.
+No-op flag for backwards compatibility.
 Previous versions of
 .Nm
 used this to adjust
@@ -702,7 +710,7 @@ List the jail's fstab.
 .It Op Fl r | -remove | Cm action
 Remove an entry from a specific jail's
 .Pa fstab
-and unmounts it.
+and unmount it.
 .El
 .Pp
 Example:
@@ -794,7 +802,7 @@ List all bases.
 Shows JID, NAME, BOOT, STATE, TYPE, RELEASE, IP4, IP6, and
 TEMPLATE information.
 .It Op Fl q | -quick
-Lists all jails with less processing and fields.
+Lists all jails with less processing and fewer fields.
 .It Op Fl s | -sort Ar TEXT
 Sorts the list by the given type.
 .It Op Fl t | -template | Cm dataset_type
@@ -811,7 +819,7 @@ each installed jail:
 .It JID
 Jail identifier
 .It UUID
-Unique identifcation number.
+Unique identification number.
 .It STATE
 Displays the active state of the jail.
 Can be up or down.
@@ -865,6 +873,9 @@ Options:
 .Bl -tag -width "[-s | --soft]"
 .It Op Fl s | -soft
 Restart the jail, but do not tear down the network stack.
+This does not recreate the jail or apply properties that require a full
+restart, such as
+.Cm cpuset .
 .El
 .Pp
 Examples:
@@ -943,7 +954,7 @@ Example:
 Delete snapshots of the specified jail.
 If the keyword
 .Op Ar ALL
-is used, all snapshots the specified jail are deleted.
+is used, all snapshots of the specified jail are deleted.
 .Pp
 Options:
 .Bl -tag -width "[-n | --name]"
@@ -1091,7 +1102,7 @@ using the requested IP address.
 .Pp
 Source: local
 .It Pf bpf= Op 1 | 0
-Toggle starting the jail with Berkely Packet Filter devices enabled.
+Toggle starting the jail with Berkeley Packet Filter devices enabled.
 .Pp
 Default: 0
 .Pp
@@ -1182,7 +1193,7 @@ A boolean option to change the formerly mentioned behavior and
 disable IPv4 source address selection for the prison in favor of
 the primary IPv4 address of the jail.
 Source address selection is enabled by default for all jails and
-the ip4_nosaddrsel settting of a parent jail is not inherited for
+the ip4_nosaddrsel setting of a parent jail is not inherited for
 any child jails.
 .Pp
 Default: 1
@@ -1201,12 +1212,14 @@ Default: new
 .Pp
 Source:
 .Xr jail 8
-.It Pf defaultrouter= Op none | ipaddress
-Setting this property to anything other than none configures a
-default route inside a VNET jail.
-.It Pf defaultrouter6= Op none | ip6address
-Setting this property to anything other than none configures a
-default IPv6 route inside a VNET jail.
+.It Pf defaultrouter= Op auto | none | ipaddress
+Sets the default IPv4 gateway inside a VNET jail.
+The default, auto, uses the host's default IPv4 gateway if one is available.
+Set to none to skip adding a default route.
+.It Pf defaultrouter6= Op auto | none | ip6address
+Sets the default IPv6 gateway inside a VNET jail.
+The default, auto, uses the host's default IPv6 gateway if one is available.
+Set to none to skip adding a default route.
 .It Pf resolver= Op none | nameserver IP;nameserver IP;search domain.local | /dev/null
 Set the jail's resolver
 .Pq resolv.conf .
@@ -1426,9 +1439,6 @@ Mount a
 filesystem in the jail's
 .Pa /dev/fd
 directory.
-Note: This is not supported on
-.Fx
-9.3 .
 .Pp
 Default: 1
 .Pp
@@ -1458,7 +1468,7 @@ When set to 0, all mount points are available without any
 restrictions.
 When set to 1, only mount points below the jail's chroot directory
 are visible.
-Additionaly, the path to the jail's chroot directory is removed
+Additionally, the path to the jail's chroot directory is removed
 from the front of their pathnames.
 When set to 2 (default), the syscalls above can operate only on a
 mountpoint where the jail's chroot directory is located.
@@ -1546,15 +1556,7 @@ Source:
 .It Pf allow_sysvipc= Op 1 | 0
 Set whether a process in the jail has access to System V IPC
 primitives.
-Prior to
-.Fx
-11.0, System V primitives share a single namespace
-across the host and jail environments, meaning that processes within a
-jail would be able to communicate with, and potentially interfere
-with, processes outside of the jail, or in other jails.
-In
-.Fx
-11.0 and later, this setting is deprecated.
+This setting is deprecated.
 Use sysvmsg, sysvsem, and sysvshm instead.
 .Pp
 Default: 0
@@ -1572,9 +1574,6 @@ The system or parent jail has access to the jail's objects, but not to
 its keys.
 When set to disable, the jail cannot perform any sysvmsg-related
 system calls.
-Ignored in
-.Fx
-10.3 and earlier.
 .Pp
 Default: new
 .Pp
@@ -1583,9 +1582,6 @@ Source:
 .It Pf sysvsem= Op disable | inherit | new
 Allow access to SYSV IPC semaphore primitives in the same manner as
 sysvmsg.
-Ignored in
-.Fx
-10.3 and earlier.
 .Pp
 Default: new
 .Pp
@@ -1594,9 +1590,6 @@ Source:
 .It Pf sysvshm= Op disable | inherit | new
 Allow access to SYSV IPC shared memory primitives in the same manner
 as sysvmsg.
-Ignored in
-.Fx
-10.3 and earlier.
 .Pp
 Default: new
 .Pp
@@ -1664,10 +1657,6 @@ file system.
 This permission is effective only together with allow.mount and if
 enforce_statfs is set to a value lower than 2.
 .Pp
-Note: This is not supported on
-.Fx
-9.3.
-.Pp
 Default: 0
 .Pp
 Source:
@@ -1677,10 +1666,6 @@ Allow privileged users inside the jail to mount and unmount fusefs file
 systems.
 This permission is effective only together with allow_mount and if
 enforce_statfs is set to a value lower than 2.
-.Pp
-Note: This requires
-.Fx
-12.0 or later.
 .Pp
 Default: 0
 .Pp
@@ -1731,10 +1716,6 @@ Allow privileged users inside the jail to mount and unmount the tmpfs
 file system.
 This permission is effective only together with allow.mount and if
 enforce_statfs is set to a value lower than 2.
-.Pp
-Note: This is not supported on
-.Fx
-9.3.
 .Pp
 Default: 0
 .Pp
@@ -1795,11 +1776,6 @@ inside the jail.
 The
 .Xr vmm 4
 kernel module must be loaded for this to take effect.
-.Pp
-Note: This requires
-.Fx
-12.0
-or later.
 .Pp
 Default: 0
 .Pp
@@ -1990,9 +1966,15 @@ Source:
 This is for future use, currently not supported.
 .It sync_tgt_zpool
 For future use, currently not supported.
-.It Pf cpuset= Op 1 | 1,2,3,4 | 1-2 | off
+.It Pf cpuset= Op 0 | 0,1,2 | 0-2 | all | off
 .Pp
 Control the jail's CPU affinity.
+CPU IDs identify logical CPUs and start at 0.
+Use
+.Ql cpuset -g -s 0
+on the host to find available CPU IDs.
+Changes take effect when the jail starts or is fully restarted.
+This setting does not reserve CPUs exclusively for the jail.
 .Pp
 Default: off
 .Pp
@@ -2018,6 +2000,64 @@ If not the same as the host, do not start the jail.
 .Pp
 Default: 0
 .El
+.Ss Resource limits
+RCTL resource limit properties use
+.Ar action=amount
+values, or
+.Cm off
+to disable a limit.
+Rules account for resource usage across the jail.
+Setting a supported limit on a running jail attempts to apply it immediately;
+check the command's result and active rules to confirm success.
+Configured limits also apply at startup.
+.Pp
+Examples:
+.Bd -literal -offset indent
+iocage set memoryuse=deny=4G examplejail
+iocage set pcpu=deny=20 examplejail
+iocage set memoryuse=off examplejail
+.Ed
+.Pp
+The
+.Cm memoryuse
+example limits aggregate resident memory to 4 GiB.
+The
+.Xr rctl 8
+manual warns that resident-memory limits can cause severe thrashing.
+The
+.Cm vmemoryuse
+property limits virtual address space, and
+.Cm swapuse
+limits swap reservations and usage.
+.Pp
+The
+.Cm pcpu
+example limits aggregate CPU usage to 20% of one CPU's capacity.
+A value of 100 represents one CPU's capacity; 200 represents two CPUs'.
+Use the
+.Cm deny
+action for CPU limits.
+The
+.Cm throttle
+action is supported only for I/O limits.
+.Pp
+From the host, verify resource accounting, inspect active rules, and display
+current resource usage for a running jail:
+.Bd -literal -offset indent
+sysctl -n kern.racct.enable
+rctl jail:ioc-examplejail
+rctl -hu jail:ioc-examplejail
+.Ed
+.Pp
+The sysctl must print 1.
+Use the actual jail name reported by
+.Ql jls -n name
+in the
+.Cm jail :
+filter.
+See
+.Xr rctl 8
+for supported resources, actions, and units.
 .Sh EXAMPLES
 Set up
 .Nm
@@ -2074,9 +2114,6 @@ IPFW and PF are fully supported inside a VNET jail.
 The actual jail name in the
 .Xr jls 8
 output is set to ioc-UUID.
-This is a required workaround as jails refuse to start with
-.Xr jail 8
-when the jail name starts with a "0".
 .Pp
 .Xr dmesg 8
 information leakage inside jails can be prevented with this sysctl:

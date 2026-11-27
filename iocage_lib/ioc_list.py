@@ -28,9 +28,11 @@ import re
 import subprocess as su
 import uuid as _uuid
 
+import texttable
+
 import iocage_lib.ioc_common
 import iocage_lib.ioc_json
-import texttable
+import iocage_lib.ioc_nat as ioc_nat
 
 from iocage_lib.dataset import Dataset
 
@@ -189,6 +191,7 @@ class IOCList(object):
         default_gateways = iocage_lib.ioc_common.get_host_gateways()
         jail_list = []
         plugin_index_data = {}
+        active_nat = None
 
         for jail in jails:
             try:
@@ -317,17 +320,22 @@ class IOCList(object):
                 try:
                     with open(f"{mountpoint}/plugin/ui.json", "r") as u:
                         ui_data = json.load(u)
-                        admin_portal = ','.join(
-                            iocage_lib.ioc_common.retrieve_admin_portals(
-                                conf, bool(jid), ui_data['adminportal'], default_gateways, ip_dict
-                            )
-                        )
+                        admin_portal = '-'
                         try:
-                            ph = ui_data["adminportal_placeholders"].items()
+                            if jid and active_nat is None:
+                                active_nat = ioc_nat.portal_records(
+                                    active_jails)
+                            admin_portal = ','.join(
+                                iocage_lib.ioc_common.retrieve_admin_portals(
+                                    conf, bool(jid), ui_data['adminportal'],
+                                    default_gateways, ip_dict, active_nat
+                                )
+                            )
+                            ph = ui_data.get('adminportal_placeholders', {})
                             if ph and not bool(jid):
                                 admin_portal = f"{uuid} is not running!"
                             else:
-                                for placeholder, prop in ph:
+                                for placeholder, prop in ph.items():
                                     admin_portal = admin_portal.replace(
                                         placeholder,
                                         iocage_lib.ioc_json.IOCJson(
@@ -336,6 +344,9 @@ class IOCList(object):
                                     )
                         except KeyError:
                             pass
+                        except ValueError as error:
+                            # One older, invalid forward affects only its row.
+                            admin_portal = str(error)
                         except iocage_lib.ioc_exceptions.CommandNeedsRoot:
                             admin_portal = "Admin Portal requires root"
                         except iocage_lib.ioc_exceptions.CommandFailed as e:
@@ -482,11 +493,18 @@ class IOCList(object):
     @classmethod
     def list_get_jid(cls, uuid):
         """Return a tuple containing True or False and the jail's id or '-'."""
+        name = f"ioc-{uuid.replace('.', '_')}"
         try:
             jid = iocage_lib.ioc_common.checkoutput(
-                ["jls", "-j", f"ioc-{uuid.replace('.', '_')}"],
-                stderr=su.PIPE).split()[5]
-
-            return True, jid
+                ['jls', '-j', name, 'jid'], stderr=su.PIPE
+            ).strip()
         except su.CalledProcessError:
-            return False, "-"
+            # A named lookup uses the same exit code for a missing jail and
+            # a query error. Only a successful inventory can confirm absence.
+            active = iocage_lib.ioc_common.get_active_jails()
+            if name not in active:
+                return False, '-'
+
+            jid = str(active[name]['jid'])
+
+        return True, jid

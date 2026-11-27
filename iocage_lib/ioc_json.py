@@ -29,25 +29,27 @@ import ipaddress
 import json
 import logging
 import os
+import pathlib
+import random
 import re
 import shutil
 import string
 import subprocess as su
 import sys
 
+import netifaces
+
 import iocage_lib.ioc_common
 import iocage_lib.ioc_create
+import iocage_lib.ioc_exceptions as ioc_exceptions
 import iocage_lib.ioc_exec
 import iocage_lib.ioc_fstab
 import iocage_lib.ioc_list
+import iocage_lib.ioc_nat
 import iocage_lib.ioc_stop
-import iocage_lib.ioc_exceptions as ioc_exceptions
-import netifaces
-import random
-import pathlib
 
 from iocage_lib.dataset import Dataset
-from iocage_lib.pools import PoolListableResource, Pool
+from iocage_lib.pools import Pool, PoolListableResource
 from iocage_lib.snapshot import Snapshot
 
 
@@ -2219,9 +2221,7 @@ class IOCJson(IOCConfiguration):
                     _callback=self.callback,
                     silent=self.silent)
 
-            active_nat_jails = iocage_lib.ioc_common.get_jails_with_config(
-                lambda j: (j['state'] == 'up' and j['nat'])
-            )
+            active_nat_jails = iocage_lib.ioc_nat.running_jails()
             active_jails_msg = '\n'.join(
                 f'   - {jail}' for jail in active_nat_jails
             )
@@ -2262,6 +2262,20 @@ class IOCJson(IOCConfiguration):
                 os.path.join(self.pool, 'iocage', _type, uuid)
             ).set_property(key, value)
 
+            return value, conf
+
+        elif key == 'nat_forwards':
+            try:
+                iocage_lib.ioc_common.parse_nat_forwards(value)
+            except ValueError as error:
+                iocage_lib.ioc_common.logit({
+                    'level': 'EXCEPTION', 'message': str(error)
+                }, _callback=self.callback, silent=self.silent,
+                    exception=ioc_exceptions.ValidationFailed)
+            # Preserve the stored TCP notation used for bare ports.
+            value = ','.join(f'tcp({v})' if v.isdecimal() else v
+                             for v in value.split(','))
+            conf[key] = value
             return value, conf
 
         elif key in props.keys():
@@ -2414,34 +2428,6 @@ class IOCJson(IOCConfiguration):
                                 _callback=self.callback,
                                 silent=self.silent
                             )
-                elif key == 'nat_forwards':
-                    new_value = []
-
-                    if value != 'none':
-                        regex = re.compile(
-                            r'^(tcp|udp|tcp\/udp)\(\d{1,5}((:|-?)(\d{1,5}))\)'
-                        )
-                        for fwd in value.split(','):
-                            # We assume TCP for simpler inputs
-                            fwd = f'tcp({fwd})' if fwd.isdigit() else fwd
-                            new_value.append(fwd)
-
-                            match = regex.match(fwd)
-                            if not match or len(fwd) != match.span()[1]:
-                                iocage_lib.ioc_common.logit(
-                                    {
-                                        'level': 'EXCEPTION',
-                                        'message': f'Invalid nat_forwards'
-                                                   f' value: {value}'
-                                    },
-                                    _callback=self.callback,
-                                    silent=self.silent,
-                                    exception=ioc_exceptions.ValidationFailed
-                                )
-
-                        if new_value:
-                            value = ','.join(new_value)
-                            conf[key] = value
                 elif key == 'nat_prefix':
                     if value != 'none':
                         try:

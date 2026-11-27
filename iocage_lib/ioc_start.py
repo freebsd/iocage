@@ -24,23 +24,23 @@
 """This is responsible for starting jails."""
 import datetime
 import hashlib
+import ipaddress
+import json
+import logging
 import os
 import re
-import fcntl
-import itertools
 import shutil
-import json
 import subprocess as su
+
 import netifaces
-import ipaddress
-import logging
 
 import iocage_lib.ioc_common
+import iocage_lib.ioc_exceptions as ioc_exceptions
 import iocage_lib.ioc_exec
 import iocage_lib.ioc_json
 import iocage_lib.ioc_list
+import iocage_lib.ioc_nat as ioc_nat
 import iocage_lib.ioc_stop
-import iocage_lib.ioc_exceptions as ioc_exceptions
 
 
 class IOCStart(object):
@@ -53,7 +53,8 @@ class IOCStart(object):
 
     def __init__(
         self, uuid, path, silent=False, callback=None, is_depend=False,
-        unit_test=False, suppress_exception=False, used_ports=None
+        unit_test=False, suppress_exception=False, used_ports=None,
+        used_ips=None, reserved_ports=None
     ):
         self.jail_uuid = uuid
         self.uuid = uuid.replace(".", "_")
@@ -68,6 +69,10 @@ class IOCStart(object):
         self.defaultrouter6 = 'auto'
         self.log = logging.getLogger('iocage')
         self.used_ports = used_ports or []
+        self.used_ips = used_ips
+        self.reserved_ports = reserved_ports
+        self._reserved_devfs_ruleset = None
+        self._created_jid = None
 
         if not self.unit_test:
             self.conf = iocage_lib.ioc_json.IOCJson(path).json_get_value('all')
@@ -82,9 +87,23 @@ class IOCStart(object):
             self.exec_fib = self.conf["exec_fib"]
             try:
                 self.__start_jail__()
-            except (Exception, SystemExit) as e:
-                if not suppress_exception:
-                    raise e
+            except (Exception, SystemExit, KeyboardInterrupt) as error:
+                if self._created_jid is not None:
+                    # Stop only the instance created by this attempt.
+                    try:
+                        iocage_lib.ioc_stop.IOCStop(
+                            self.jail_uuid, self.path, force=True, silent=True,
+                            expected_jid=self._created_jid,
+                            cleanup_devfs=self._reserved_devfs_ruleset is None
+                        )
+                    except (Exception, SystemExit) as cleanup_error:
+                        self.log.error('Could not stop %s after failed start: '
+                                       '%s', self.uuid, cleanup_error)
+                if (not suppress_exception or
+                        isinstance(error, KeyboardInterrupt)):
+                    raise
+            finally:
+                self._release_reserved_devfs_ruleset()
 
     def __start_jail__(self):
         """
@@ -208,33 +227,8 @@ class IOCStart(object):
                 )
                 prop_missing = True
 
-        if nat and nat_forwards != 'none':
-            # If NAT is enabled and nat port forwarding as well,
-            # we want to make sure that the current jail's port forwarding
-            # does not conflict with other running jail's nat_forwards
-
-            if set(int(v[-1]) for v in self.__parse_nat_fwds__(
-                nat_forwards
-            )) & set(itertools.chain(
-                *iocage_lib.ioc_common.get_jails_with_config(
-                    lambda j: (j['state'] == 'up' and j['nat'] and
-                               j['nat_forwards'] != 'none'),
-                    lambda j: [
-                        int(v[-1]) for v in
-                        self.__parse_nat_fwds__(
-                            j['nat_forwards']
-                        )
-                    ]
-                ).values(), self.used_ports
-            )):
-                iocage_lib.ioc_common.logit(
-                    {
-                        'level': 'EXCEPTION',
-                        'message': f'Please correct {nat_forwards} port rule '
-                        'as another running jail is using one of the '
-                        'mentioned ports.'
-                    }
-                )
+        if nat:
+            self._check_nat_forwards(nat_forwards)
 
         if nat and nat_interface == 'none':
             self.log.debug('Grabbing default route\'s interface')
@@ -384,7 +378,7 @@ class IOCStart(object):
                     f'Generating IP from nat_prefix: {self.conf["nat_prefix"]}'
                 )
                 ip4_addr, _ = iocage_lib.ioc_common.gen_nat_ip(
-                    self.conf['nat_prefix']
+                    self.conf['nat_prefix'], self.used_ips
                 )
                 self.ip4_addr = f'{nat_interface}|{ip4_addr}'
                 # Make this reality for list
@@ -398,7 +392,7 @@ class IOCStart(object):
                 )
                 self.defaultrouter, ip4_addr = \
                     iocage_lib.ioc_common.gen_nat_ip(
-                        self.conf['nat_prefix']
+                        self.conf['nat_prefix'], self.used_ips
                     )
                 self.ip4_addr = f'vnet0|{ip4_addr}/30'
                 # Make this reality for list
@@ -420,7 +414,9 @@ class IOCStart(object):
                 # Make sure this exists, jail(8) will tear it down if we don't
                 # manually do this.
                 if localhost_ip == 'none':
-                    localhost_ip = iocage_lib.ioc_common.gen_unused_lo_ip()
+                    localhost_ip = iocage_lib.ioc_common.gen_unused_lo_ip(
+                        self.used_ips
+                    )
                     self.set(f'localhost_ip={localhost_ip}')
 
                 with open(
@@ -524,6 +520,9 @@ class IOCStart(object):
                 silent=self.silent)
             return
 
+        # This start owns the reservation until jail -c succeeds.
+        self._reserved_devfs_ruleset = devfs_ruleset
+
         # Manually configured devfs_ruleset doesn't support all iocage features
         if manual_devfs_config:
             if devfs_paths is not None or devfs_includes is not None:
@@ -603,7 +602,7 @@ class IOCStart(object):
         )
         jail.sync_changes()
 
-        start_cmd = ['jail']
+        start_cmd = ['jail', '-i']
 
         if debug_mode:
             start_cmd.append('-v')
@@ -651,55 +650,8 @@ class IOCStart(object):
         else:
             pre_start_env = None
 
-        prestart_success, prestart_error = iocage_lib.ioc_common.runscript(
-            exec_prestart, pre_start_env
-        )
-
-        if prestart_error:
-            iocage_lib.ioc_stop.IOCStop(
-                self.uuid, self.path, force=True, silent=True
-            )
-
-            iocage_lib.ioc_common.logit({
-                'level': 'EXCEPTION',
-                'message': '  + Executing exec_prestart FAILED\n'
-                           f'ERROR:\n{prestart_error}\n\nRefusing to '
-                           f'start {self.uuid}: exec_prestart failed'
-            },
-                _callback=self.callback,
-                silent=self.silent
-            )
-
-        start = su.Popen(
-            start_cmd, stderr=su.PIPE,
-            stdout=su.PIPE if not debug_mode else None,
-            env=start_env
-        )
-
-        stdout_data, stderr_data = start.communicate()
-
-        if start.returncode:
-            # This is actually fatal.
-            msg = "  + Start FAILED"
-            iocage_lib.ioc_common.logit({
-                "level": "ERROR",
-                "message": msg
-            },
-                _callback=self.callback,
-                silent=self.silent)
-
-            iocage_lib.ioc_common.logit({
-                "level": "EXCEPTION",
-                "message": stderr_data.decode('utf-8')
-            }, _callback=self.callback,
-                silent=self.silent)
-        else:
-            iocage_lib.ioc_common.logit({
-                "level": "INFO",
-                "message": "  + Started OK"
-            },
-                _callback=self.callback,
-                silent=self.silent)
+        self.__run_prestart__(exec_prestart, pre_start_env)
+        self._create_jail(start_cmd, start_env, debug_mode)
 
         iocage_lib.ioc_common.logit({
             'level': 'INFO',
@@ -742,13 +694,9 @@ class IOCStart(object):
                     _callback=self.callback,
                     silent=self.silent)
 
-            iocage_lib.ioc_stop.IOCStop(
-                self.uuid, self.path, force=True, silent=True
-            )
-
             iocage_lib.ioc_common.logit({
                 "level": "EXCEPTION",
-                "message": f"\nStopped {self.uuid} due to VNET failure"
+                "message": f"\nCannot start {self.uuid} due to VNET failure"
             },
                 _callback=self.callback)
 
@@ -809,12 +757,7 @@ class IOCStart(object):
                 f'Adding NAT: Interface - {nat_interface}'
                 f' Forwards - {nat_forwards} Backend - {nat_backend}'
             )
-            # We use a lock here to ensure that two jails at the same
-            # time do not attempt to write nat rules
-            with open('/tmp/iocage_nat_lock', 'w') as f:
-                # Lock is automatically released when file is closed
-                fcntl.flock(f, fcntl.LOCK_EX)
-                self.__add_nat__(nat_interface, nat_forwards, nat_backend)
+            self.__add_nat__(nat_interface, nat_forwards, nat_backend)
 
         # This needs to be a list.
         exec_start = self.conf['exec_start'].split()
@@ -843,10 +786,6 @@ class IOCStart(object):
             except ioc_exceptions.CommandFailed as e:
 
                 error = str(e)
-                iocage_lib.ioc_stop.IOCStop(
-                    self.uuid, self.path, force=True, silent=True
-                )
-
                 msg = f'  + Starting services FAILED\nERROR:\n{error}\n\n' \
                     f'Refusing to start {self.uuid}: exec_start failed'
                 iocage_lib.ioc_common.logit({
@@ -870,10 +809,9 @@ class IOCStart(object):
                 f.write(f'{success}\n{error}')
 
         # Running exec_poststart now
-        _, jid = iocage_lib.ioc_list.IOCList().list_get_jid(self.uuid)
         post_start_env = {
             **os.environ,
-            'JID': jid,
+            'JID': self._created_jid,
             'JNAME': f"ioc-{self.uuid}",
         }
         poststart_success, poststart_error = \
@@ -882,10 +820,6 @@ class IOCStart(object):
             )
 
         if poststart_error:
-
-            iocage_lib.ioc_stop.IOCStop(
-                self.uuid, self.path, force=True, silent=True
-            )
 
             iocage_lib.ioc_common.logit({
                 'level': 'EXCEPTION',
@@ -940,15 +874,11 @@ class IOCStart(object):
                 addr = 'ERROR, check jail logs'
 
             if failed_dhcp:
-                iocage_lib.ioc_stop.IOCStop(
-                    self.uuid, self.path, force=True, silent=True
-                )
-
                 iocage_lib.ioc_common.logit({
                     'level': 'EXCEPTION',
                     'message': '  + Acquiring DHCP address: FAILED,'
                     f' address received: {addr}\n'
-                    f'\nStopped {self.uuid} due to DHCP failure'
+                    f'\nCannot start {self.uuid} due to DHCP failure'
                 },
                     _callback=self.callback)
 
@@ -1586,6 +1516,31 @@ class IOCStart(object):
 
         return membermtu[5]
 
+    def _check_nat_forwards(self, forwards):
+        try:
+            ports = ioc_nat.forward_ports(forwards)
+            # Workers may use only the ports reserved during preflight.
+            if self.used_ips is not None and self.reserved_ports is None:
+                iocage_lib.ioc_common.logit({
+                    'level': 'EXCEPTION',
+                    'message': 'NAT enabled after preflight'
+                }, _callback=self.callback, silent=self.silent)
+            if (self.reserved_ports is not None and
+                    not ports.issubset(self.reserved_ports)):
+                iocage_lib.ioc_common.logit({
+                    'level': 'EXCEPTION',
+                    'message': 'NAT forwarding ports changed after preflight'
+                }, _callback=self.callback, silent=self.silent)
+            if (not ports.isdisjoint(self.used_ports) or
+                    not ports.isdisjoint(ioc_nat.running_ports())):
+                iocage_lib.ioc_common.logit({
+                    'level': 'EXCEPTION',
+                    'message': f'Please correct {forwards} port rule as a '
+                               'host port is already in use.'
+                }, _callback=self.callback, silent=self.silent)
+        except (su.CalledProcessError, ValueError) as error:
+            self._nat_error(error)
+
     def __check_nat__(self, backend='ipfw'):
         su.run(
             ['sysctl', '-q', 'net.inet.ip.forwarding=1'], stdout=su.PIPE,
@@ -1639,156 +1594,104 @@ class IOCStart(object):
             )
 
     def __add_nat__(self, nat_interface, forwards, backend='ipfw'):
-        if backend == 'pf':
-            pf_conf = self.__add_nat_pf__(nat_interface, forwards)
-            pf = su.run(
-                ['pfctl', '-f', pf_conf], stdout=su.PIPE, stderr=su.PIPE
-            )
-            self.log.debug(f'pfctl -f {pf_conf} ran')
+        """Report firewall errors through the same CLI and library paths."""
+        try:
+            if backend == 'ipfw':
+                su.run(['ifconfig', nat_interface, '-tso4', '-lro',
+                        '-vlanhwtso'])
+            ioc_nat.apply(f'ioc-{self.uuid}', self.ip4_addr, nat_interface,
+                          forwards, backend)
+        except (su.CalledProcessError, ValueError) as error:
+            self._nat_error(error)
 
-            if pf.returncode != 0:
-                iocage_lib.ioc_common.logit({
-                    'level': 'EXCEPTION',
-                    'message': pf.stderr.decode()
-                }, _callback=self.callback,
-                    silent=self.silent,
-                    exception=ioc_exceptions.CommandFailed)
+    def _nat_error(self, error):
+        message = getattr(error, 'stderr', None) or str(error)
+        iocage_lib.ioc_common.logit({
+            'level': 'EXCEPTION', 'message': message.strip()
+        }, _callback=self.callback, silent=self.silent,
+            exception=ioc_exceptions.CommandFailed)
 
-        else:
-            su.run(['ifconfig', nat_interface, '-tso4', '-lro', '-vlanhwtso'])
-            self.log.debug(f'TSO, LRO, VLANHWTSO disabled on {nat_interface}')
-            ipfw_conf = self.__add_nat_ipfw__(nat_interface, forwards)
-            ipfw = su.run(
-                ['sh', '-c', ipfw_conf], stdout=su.PIPE, stderr=su.PIPE
-            )
-            self.log.debug(f'{ipfw_conf} ran')
+    def _release_reserved_devfs_ruleset(self):
+        """Release an unused reservation left by a failed start."""
+        ruleset = self._reserved_devfs_ruleset
 
-            if ipfw.returncode != 0:
-                iocage_lib.ioc_common.logit({
-                    'level': 'EXCEPTION',
-                    'message': ipfw.stderr.decode()
-                }, _callback=self.callback,
-                    silent=self.silent,
-                    exception=ioc_exceptions.CommandFailed)
+        if ruleset is None:
+            return
 
-    def __add_nat_pf__(self, nat_interface, forwards):
-        pf_conf = '/tmp/iocage_nat_pf.conf'
-        ip4_addr = self.ip4_addr.split('|')[1].rsplit('/')[0]
-        nat_network = str(
-            ipaddress.IPv4Network(f'{ip4_addr}/24', strict=False)
-        )
-        rules = [
-            f'nat on {nat_interface} from {nat_network} to any ->'
-            f' ({nat_interface}:0) static-port'
-        ]
-        self.log.debug(f'Initial Rule: {rules[0]}')
-        rdrs = []
+        # Never delete the same ID again after another start reuses it.
+        self._reserved_devfs_ruleset = None
 
-        if forwards != 'none':
-            for proto, port, map in self.__parse_nat_fwds__(forwards):
-                # ipfw port ranges do not work with pf
-                port = port.replace('-', ':')
-                map = map.replace('-', ':')
-
-                rdrs.append(
-                    f'rdr pass on {nat_interface} inet proto {proto} from any'
-                    f' to ({nat_interface}:0) port {map} -> {ip4_addr}'
-                    f' port {port}\n'
+        try:
+            with iocage_lib.ioc_common.devfs_ruleset_lock():
+                # A failed jail -c may still leave a live or dying jail.
+                jails = su.check_output(
+                    ['jls', '-d', 'name', 'devfs_ruleset'], text=True
                 )
-        self.log.debug(f'Forwards: {rdrs}')
 
-        with open(os.open(pf_conf, os.O_CREAT | os.O_RDWR), 'w+') as f:
-            self.log.debug(f'{pf_conf} opened')
-            for line in f.readlines():
-                line = line.rstrip()
-                if line.startswith('rdr') and ip4_addr not in line:
-                    rules.append(line)
+                for line in jails.splitlines():
+                    name, active_ruleset = line.split()
 
-            f.seek(0)
-            for rule in rules:
-                f.write(f'{rule}\n')
-                self.log.debug(f'Wrote: {rule}')
-            for rdr in rdrs:
-                f.write(rdr)
-                self.log.debug(f'Wrote: {rdr}')
-            f.truncate()
+                    if name == f'ioc-{self.uuid}' or active_ruleset == ruleset:
+                        return
 
-        os.chmod(pf_conf, 0o755)
+                su.run(['devfs', 'rule', '-s', ruleset, 'delset'],
+                       stdout=su.PIPE, check=True)
+        except (OSError, su.SubprocessError, ValueError) as error:
+            # Keep the original startup error in the worker's failure summary.
+            self.log.warning('Could not release devfs ruleset %s for %s: %s',
+                             ruleset, self.uuid, error)
 
-        return pf_conf
-
-    def __add_nat_ipfw__(self, nat_interface, forwards):
-        ipfw_conf = '/tmp/iocage_nat_ipfw.conf'
-        nat_rule = f'ipfw -q nat 462 config if {nat_interface} same_ports'
-        self.log.debug(f'Initial rule: {nat_rule}')
-        rdrs = ''
-        ip4_addr = self.ip4_addr.split('|')[1].rsplit('/')[0]
-        nat_network = str(
-            ipaddress.IPv4Network(f'{ip4_addr}/24', strict=False)
-        )
-        rules = [
-            'ipfw -q flush',
-            f'ipfw -q add 100 nat 462 ip4 from {nat_network} to any'
-            f' out via {nat_interface}',
-            'ipfw -q add 101 nat 462 ip4 from any to any in via'
-            f' {nat_interface}'
-        ]
-        self.log.debug(f'Rules: {rules}')
-
-        if forwards != 'none':
-            for proto, port, map in self.__parse_nat_fwds__(forwards):
-                rdrs += f' redirect_port {proto} {ip4_addr}:{port} {map}'
-
-        with open(os.open(ipfw_conf, os.O_CREAT | os.O_RDWR), 'w+') as f:
-            self.log.debug(f'{ipfw_conf} opened')
-            for line in f.readlines():
-                line = line.rstrip()
-                if line not in rules and nat_rule in line:
-                    nat_line = line.split('redirect_port ')
-                    final_line = nat_rule
-
-                    for n in nat_line:
-                        if 'nat' in n:
-                            continue
-
-                        if ip4_addr not in n:
-                            final_line += f' redirect_port {n}'
-
-                    rules.insert(1, f'{final_line}{rdrs}')
-                    self.log.debug(
-                        f'Inserted: {final_line}{rdrs} into rules at index 1'
-                    )
-
-            if rules[1].endswith(nat_interface):
-                # They don't have any port-forwards or the file is empty
-                if rdrs:
-                    nat_rule += rdrs
-
-                rules.insert(1, nat_rule)
-                self.log.debug(f'Inserted: {nat_rule} into rules at index 1')
-
-            f.seek(0)
-            for rule in rules:
-                f.write(f'{rule}\n')
-                self.log.debug(f'Wrote: {rule}')
-            f.truncate()
-
-        os.chmod(ipfw_conf, 0o755)
-
-        return ipfw_conf
-
-    def __parse_nat_fwds__(self, forwards):
-        self.log.debug(f'Parsing NAT forwards: {forwards}')
-
-        for fwd in forwards.split(','):
-            proto, port = fwd.split('(')
-            port = port.strip('()')
-
-            self.log.debug(f'Proto: {proto} Port: {port}')
+    def _create_jail(self, command, environment, debug_mode):
+        try:
+            start = su.run(command, capture_output=True, env=environment)
+        except KeyboardInterrupt:
+            # A creation hook can be interrupted after the kernel assigned
+            # a JID. The reserved ruleset identifies this attempt even when
+            # subprocess.run didn't return the output of jail -i.
             try:
-                port, map = port.rsplit(':', 1)
-            except ValueError:
-                map = port
-            self.log.debug(f'Mapping {port} to {map}')
+                info = su.run(['jls', '-j', f'ioc-{self.uuid}', 'jid',
+                               'devfs_ruleset'], capture_output=True, text=True)
+                fields = info.stdout.split()
+                if (info.returncode == 0 and len(fields) == 2
+                        and fields[1] == self._reserved_devfs_ruleset):
+                    self._created_jid = fields[0]
+            except OSError as error:
+                self.log.warning('Could not look up interrupted jail %s: %s',
+                                 self.uuid, error)
+            raise
+        # jail -i prints the new JID, even if a later creation hook fails.
+        # With -v it also prints progress messages.
+        for line in start.stdout.splitlines():
+            if self._created_jid is None and line.isdigit():
+                self._created_jid = line.decode('ascii')
+            elif debug_mode:
+                print(line.decode(errors='replace'))
 
-            yield proto, port, map
+        if start.returncode:
+            iocage_lib.ioc_common.logit({
+                'level': 'ERROR', 'message': '  + Start FAILED'
+            }, _callback=self.callback, silent=self.silent)
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION', 'message': start.stderr.decode('utf-8')
+            }, _callback=self.callback, silent=self.silent)
+
+        if self._created_jid is None:
+            raise RuntimeError(f'jail did not return a JID for {self.uuid}')
+
+        # From here on, IOCStop is responsible for the running jail's ruleset.
+        self._reserved_devfs_ruleset = None
+        iocage_lib.ioc_common.logit({
+            'level': 'INFO', 'message': '  + Started OK'
+        }, _callback=self.callback, silent=self.silent)
+
+    def __run_prestart__(self, script, environment):
+        """Run the host hook before creating the jail."""
+        _, error = iocage_lib.ioc_common.runscript(script, environment)
+
+        if error:
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION',
+                'message': '  + Executing exec_prestart FAILED\n'
+                           f'ERROR:\n{error}\n\nRefusing to '
+                           f'start {self.uuid}: exec_prestart failed'
+            }, _callback=self.callback, silent=self.silent)

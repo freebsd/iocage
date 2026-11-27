@@ -22,16 +22,17 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """This stops jails."""
+import os
 import subprocess as su
+
+from pathlib import Path
 
 import iocage_lib.ioc_common
 import iocage_lib.ioc_exceptions
 import iocage_lib.ioc_exec
 import iocage_lib.ioc_json
 import iocage_lib.ioc_list
-import os
-
-from pathlib import Path
+import iocage_lib.ioc_nat as ioc_nat
 
 
 class IOCStop(object):
@@ -39,7 +40,8 @@ class IOCStop(object):
 
     def __init__(
         self, uuid, path, silent=False, callback=None,
-        force=False, suppress_exception=False
+        force=False, suppress_exception=False, expected_jid=None,
+        cleanup_devfs=True
     ):
         self.pool = iocage_lib.ioc_json.IOCJson(" ").json_get_value("pool")
         self.iocroot = iocage_lib.ioc_json.IOCJson(
@@ -47,6 +49,8 @@ class IOCStop(object):
         self.uuid = uuid.replace(".", "_")
         self.path = path
         self.force = force
+        self.expected_jid = expected_jid
+        self.cleanup_devfs = cleanup_devfs
         self.callback = callback
         self.silent = silent
 
@@ -55,6 +59,8 @@ class IOCStop(object):
                 path, suppress_log=True).json_get_value('all')
             self.status, self.jid = iocage_lib.ioc_list.IOCList().list_get_jid(
                 uuid)
+            if expected_jid is not None and self.jid != expected_jid:
+                return
             self.nics = self.conf['interfaces']
             self.__stop_jail__()
         except (Exception, SystemExit) as e:
@@ -62,17 +68,7 @@ class IOCStop(object):
                 raise e
 
     def __stop_jail__(self):
-        ip4_addr = self.conf["ip4_addr"]
-        ip6_addr = self.conf["ip6_addr"]
-        vnet = self.conf["vnet"]
-        dhcp = self.conf["dhcp"]
         exec_fib = self.conf["exec_fib"]
-        devfs_ruleset = iocage_lib.ioc_json.IOCJson(
-            self.path, suppress_log=True).json_get_value('devfs_ruleset')
-        debug_mode = True if os.environ.get(
-            'IOCAGE_DEBUG', 'FALSE') == 'TRUE' else False
-        nat = self.conf['nat']
-
         if not self.status:
             msg = f"{self.uuid} is not running!"
             iocage_lib.ioc_common.logit({
@@ -84,6 +80,7 @@ class IOCStop(object):
 
             return
 
+        ioc_nat.prepare_stop(f'ioc-{self.uuid}', self.jid)
         msg = f"* Stopping {self.uuid}"
         iocage_lib.ioc_common.logit({
             "level": "INFO",
@@ -232,6 +229,71 @@ class IOCStop(object):
 
             jail_conf.sync_changes()
 
+        removed = False
+        try:
+            with ioc_nat.removing(f'ioc-{self.uuid}', self.jid):
+                devfs_error = self._remove_jail()
+                removed = True
+        finally:
+            # Finish unmounting even if the final PF state sweep fails.
+            if removed:
+                self._poststop(devfs_error)
+
+    def _poststop(self, devfs_error):
+        poststop_success, poststop_error = iocage_lib.ioc_common.runscript(
+            self.conf['exec_poststop']
+        )
+
+        if poststop_error:
+            # This is the only exec case where we won't raise an exception
+            # as jail has already stopped
+            msg = f'  + Executing poststop FAILED\n{poststop_error}\n\n' \
+                'Jail has been stopped but there may be leftovers ' \
+                'from exec_poststop failure'
+            iocage_lib.ioc_common.logit({
+                'level': 'ERROR',
+                'message': msg
+            },
+                _callback=self.callback,
+                silent=self.silent
+            )
+        else:
+            msg = '  + Executing poststop OK'
+            iocage_lib.ioc_common.logit({
+                'level': 'INFO',
+                'message': msg
+            },
+                _callback=self.callback,
+                silent=self.silent
+            )
+
+        for command in [
+            ['umount', '-afF', f'{self.path}/fstab'],
+            ['umount', '-f', f'{self.path}/root/dev/fd'],
+            ['umount', '-f', f'{self.path}/root/dev'],
+            ['umount', '-f', f'{self.path}/root/proc'],
+            ['umount', '-f', f'{self.path}/root/compat/linux/proc']
+        ]:
+            su.Popen(
+                command,
+                stderr=su.PIPE
+            ).communicate()
+
+        if devfs_error:
+            iocage_lib.ioc_common.logit({
+                'level': 'EXCEPTION', 'message': devfs_error
+            }, _callback=self.callback, silent=self.silent)
+
+    def _remove_jail(self):
+        """Tear down networking and remove the jail before its poststop hook."""
+        ip4_addr = self.conf["ip4_addr"]
+        ip6_addr = self.conf["ip6_addr"]
+        vnet = self.conf["vnet"]
+        dhcp = self.conf["dhcp"]
+        debug_mode = True if os.environ.get(
+            'IOCAGE_DEBUG', 'FALSE') == 'TRUE' else False
+        nat = self.conf['nat']
+
         # We should still try to destroy the relevant networking
         # related resources if force is true, though we won't raise an
         # exception in that case
@@ -286,43 +348,11 @@ class IOCStop(object):
                         _callback=self.callback,
                         silent=self.silent)
 
-        # Clean up after our dynamic devfs rulesets
-        devfs_rulesets = su.run(
-            ['devfs', 'rule', 'showsets'],
-            stdout=su.PIPE, universal_newlines=True
-        )
-        ruleset_list = [int(i) for i in devfs_rulesets.stdout.splitlines()]
-
-        if int(devfs_ruleset) in ruleset_list:
-            try:
-                su.run(
-                    ['devfs', 'rule', '-s', devfs_ruleset, 'delset'],
-                    stdout=su.PIPE
-                )
-
-                iocage_lib.ioc_common.logit({
-                    "level": "INFO",
-                    "message": f'  + Removing devfs_ruleset: {devfs_ruleset}'
-                               ' OK'
-                },
-                    _callback=self.callback,
-                    silent=self.silent)
-            except su.CalledProcessError:
-                iocage_lib.ioc_common.logit({
-                    "level": 'ERROR',
-                    "message": f'  + Removing devfs_ruleset: {devfs_ruleset}'
-                               ' FAILED'
-                },
-                    _callback=self.callback,
-                    silent=self.silent)
-        else:
-            iocage_lib.ioc_common.logit({
-                "level": 'ERROR',
-                "message": '  + Refusing to remove protected devfs_ruleset:'
-                           f' {devfs_ruleset}'
-            },
-                _callback=self.callback,
-                silent=self.silent)
+        # A failed jail -c still owns its reservation and releases it after
+        # this stop. Deleting it twice could remove a parallel start's set.
+        devfs_error = None
+        if self.cleanup_devfs:
+            devfs_error = self._remove_devfs_ruleset()
 
         # Build up a jail stop command.
         cmd = ['jail', '-q']
@@ -338,7 +368,7 @@ class IOCStop(object):
         if jail_conf_file.is_file():
             cmd.extend(['-f', str(jail_conf_file)])
 
-        cmd.extend(['-r', f'ioc-{self.uuid}'])
+        cmd.extend(['-r', self.expected_jid or f'ioc-{self.uuid}'])
 
         stop = su.Popen(
             cmd,
@@ -347,9 +377,9 @@ class IOCStop(object):
         )
         _, stop_err = stop.communicate()
 
-        if stop_err:
+        if stop.returncode:
             msg = f'  + Removing jail process FAILED:\n' \
-                f'{stop_err.decode("utf-8")}'
+                f'{stop_err.decode() if stop_err else stop.returncode}'
             iocage_lib.ioc_common.logit({
                 'level': 'EXCEPTION',
                 'message': msg
@@ -374,42 +404,25 @@ class IOCStop(object):
                     jail_conf_file.unlink()
                 except OSError:
                     pass
+        return devfs_error
 
-        poststop_success, poststop_error = iocage_lib.ioc_common.runscript(
-            self.conf['exec_poststop']
-        )
-
-        if poststop_error:
-            # This is the only exec case where we won't raise an exception
-            # as jail has already stopped
-            msg = f'  + Executing poststop FAILED\n{poststop_error}\n\n' \
-                'Jail has been stopped but there may be leftovers ' \
-                'from exec_poststop failure'
-            iocage_lib.ioc_common.logit({
-                'level': 'ERROR',
-                'message': msg
-            },
-                _callback=self.callback,
-                silent=self.silent
-            )
-        else:
-            msg = '  + Executing poststop OK'
-            iocage_lib.ioc_common.logit({
-                'level': 'INFO',
-                'message': msg
-            },
-                _callback=self.callback,
-                silent=self.silent
-            )
-
-        for command in [
-            ['umount', '-afF', f'{self.path}/fstab'],
-            ['umount', '-f', f'{self.path}/root/dev/fd'],
-            ['umount', '-f', f'{self.path}/root/dev'],
-            ['umount', '-f', f'{self.path}/root/proc'],
-            ['umount', '-f', f'{self.path}/root/compat/linux/proc']
-        ]:
-            su.Popen(
-                command,
-                stderr=su.PIPE
-            ).communicate()
+    def _remove_devfs_ruleset(self):
+        ruleset = iocage_lib.ioc_json.IOCJson(
+            self.path, suppress_log=True).json_get_value('devfs_ruleset')
+        # Finish stopping and unmounting even if the kernel rejects cleanup.
+        try:
+            with iocage_lib.ioc_common.devfs_ruleset_lock():
+                sets = su.check_output(['devfs', 'rule', 'showsets'],
+                                       stderr=su.PIPE, text=True)
+                if ruleset not in sets.splitlines():
+                    return
+                su.run(['devfs', 'rule', '-s', ruleset, 'delset'],
+                       capture_output=True, text=True, check=True)
+        except (OSError, su.CalledProcessError) as error:
+            detail = getattr(error, 'stderr', None) or str(error)
+            return (f'Could not clean up devfs ruleset {ruleset}: '
+                    f'{detail.strip()}')
+        iocage_lib.ioc_common.logit({
+            'level': 'INFO',
+            'message': f'  + Removing devfs_ruleset: {ruleset} OK'
+        }, _callback=self.callback, silent=self.silent)

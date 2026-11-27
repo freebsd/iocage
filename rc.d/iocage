@@ -20,17 +20,32 @@ rcvar=iocage_enable
 load_rc_config "$name"
 : ${iocage_enable="NO"}
 : ${iocage_lang="C.UTF-8"}
+: ${iocage_parallel="NO"}
+: ${iocage_parallel_jobs=""}
+: ${iocage_program="/usr/local/bin/iocage"}
 
 start_cmd="iocage_start"
 stop_cmd="iocage_stop"
 export LANG=$iocage_lang
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 
+iocage_run()
+{
+    # Build an argument list to preserve quoted program paths and job limits.
+    if checkyesno iocage_parallel; then
+        set -- "$@" --parallel
+        if [ -n "$iocage_parallel_jobs" ]; then
+            set -- "$@" --jobs "$iocage_parallel_jobs"
+        fi
+    fi
+    "$iocage_program" "$@" --rc
+}
+
 iocage_start()
 {
     if checkyesno ${rcvar}; then
         echo "* [I|O|C] starting jails... "
-        /usr/local/bin/iocage start --rc
+        iocage_run start
     fi
 }
 
@@ -38,7 +53,7 @@ iocage_stop()
 {
     if checkyesno ${rcvar}; then
         echo "* [I|O|C] stopping jails... "
-        /usr/local/bin/iocage stop --rc
+        iocage_run stop
     fi
 }
 

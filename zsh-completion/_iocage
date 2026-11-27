@@ -299,12 +299,16 @@ _iocage() {
             ;;
           start)
             _arguments \
-                '--rc[start all jails with boot=on in priority order (lower->higher)]' \
+                '--rc[start boot=on jails in ascending priority order]' \
+                '--parallel[start independent jails in priority groups]' \
+                '--jobs[limit concurrent starts; requires --parallel]:jobs:' \
                 ::jail:_iocage_list_jails
             ;;
           stop)
             _arguments \
-                '--rc[stop all jails with boot=on in priority order (higher->lower)]' \
+                '--rc[stop boot=on jails in descending priority order]' \
+                '--parallel[stop jails in priority groups]' \
+                '--jobs[limit concurrent stops; requires --parallel]:jobs:' \
                 ::jail:_iocage_list_jails
             ;;
           update)

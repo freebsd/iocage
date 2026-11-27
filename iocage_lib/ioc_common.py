@@ -119,7 +119,9 @@ def logit(content, _callback=None, silent=False, exception=RuntimeError):
 
     if jail is not None:
         content = dict(content)
-        content['message'] = f"{jail}: {content['message']}"
+        prefix = f'{jail}: '
+        if not str(content['message']).startswith(prefix):
+            content['message'] = f"{prefix}{content['message']}"
 
         if content['level'] == 'EXCEPTION':
             # Workers return typed errors with their message to the
@@ -788,60 +790,59 @@ def generate_devfs_ruleset(conf, paths=None, includes=None, callback=None,
                            silent=False):
     """Allocate and populate a dynamic ruleset under the shared lock."""
     with devfs_ruleset_lock():
-        return _generate_devfs_ruleset(
-            conf, paths, includes, callback, silent
-        )
+        configured = conf['devfs_ruleset']
+        listed = su.run(['devfs', 'rule', 'showsets'], stdout=su.PIPE,
+                        text=True, check=True)
+        in_use = {int(line) for line in listed.stdout.splitlines()}
+        custom = int(configured) != IOCAGE_DEVFS_RULESET
+
+        if custom:
+            if int(configured) != 0 and int(configured) not in in_use:
+                return True, configured, '-1'
+
+            source = su.run(['devfs', 'rule', '-s', str(configured), 'show'],
+                            stdout=su.PIPE, text=True, check=True)
+            # devfs prints a rule number before each rule's arguments.
+            rules = [line.split()[1:] for line in source.stdout.splitlines()
+                     if line.strip()]
+
+            if not rules:
+                # A rule without actions reserves an empty clone's ID.
+                rules = [['path', '*']]
+        else:
+            rules = _default_devfs_rules(conf, paths, includes)
+
+        # Ruleset zero is immutable and does not appear in showsets.
+        number = max(1, int(conf['min_dyn_devfs_ruleset']))
+        while number in in_use:
+            number += 1
+
+        # FreeBSD represents a ruleset ID as an unsigned 16-bit number.
+        if number > 65535:
+            raise ValueError('No available dynamic devfs ruleset in range')
+
+        target = ['devfs', 'rule', '-s', str(number)]
+        try:
+            for rule in rules:
+                su.run(target + ['add'] + rule, stdout=su.PIPE, check=True)
+        except BaseException:
+            # The ID was free under this lock. Discard even a partial clone
+            # before another start can allocate it, and keep the first error.
+            try:
+                su.run(target + ['delset'], stdout=su.PIPE, check=True)
+            except (OSError, su.SubprocessError) as error:
+                logging.getLogger('iocage').warning(
+                    'Could not remove partial devfs ruleset %s: %s',
+                    number, error
+                )
+            raise
+
+        return custom, configured, str(number)
 
 
-def _generate_devfs_ruleset(
-    conf, paths=None, includes=None, callback=None, silent=False
-):
-    """
-    Will add a per jail devfs ruleset with the specified rules,
-    specifying defaults that equal devfs_ruleset 4
-    """
-    configured_ruleset = conf['devfs_ruleset']
-    devfs_includes = []
-    devfs_rulesets = su.run(
-        ['devfs', 'rule', 'showsets'],
-        stdout=su.PIPE, universal_newlines=True
-    )
-    rulesets = {int(i) for i in devfs_rulesets.stdout.splitlines()}
-
-    # Zero is immutable and omitted by showsets, even when the configured
-    # lower bound is zero. Dynamic allocations must always use another ID.
-    ruleset = max(1, int(conf["min_dyn_devfs_ruleset"]))
-    while ruleset in rulesets:
-        ruleset += 1
-    ruleset = str(ruleset)
-
-    # Custom devfs_ruleset configured, clone to dynamic ruleset
-    if int(configured_ruleset) != IOCAGE_DEVFS_RULESET:
-        if (int(configured_ruleset) != 0 and
-                int(configured_ruleset) not in rulesets):
-            return True, configured_ruleset, '-1'
-        rules = su.run(
-            ['devfs', 'rule', '-s', str(configured_ruleset), 'show'],
-            stdout=su.PIPE, universal_newlines=True
-        ).stdout.splitlines()
-
-        if not rules:
-            # An empty clone has no kernel reference until the jail mounts
-            # devfs. A rule without actions reserves its ID under the lock
-            # without changing device visibility or permissions.
-            su.run(
-                ['devfs', 'rule', '-s', ruleset, 'add', 'path', '*'],
-                stdout=su.PIPE, check=True
-            )
-
-        for rule in rules:
-            su.run(['devfs', 'rule', '-s', ruleset, 'add'] +
-                   rule.split(' ')[1:], stdout=su.PIPE)
-
-        return (True, configured_ruleset, ruleset)
-
-    # Create default ruleset
-    devfs_dict = dict((dev, None) for dev in (
+def _default_devfs_rules(conf, paths, includes):
+    """Build the ordered devfs rules for iocage-managed device access."""
+    devfs_dict = dict.fromkeys((
         'hide', 'null', 'zero', 'crypto', 'random', 'urandom', 'ptyp*',
         'ptyq*', 'ptyr*', 'ptys*', 'ptyP*', 'ptyQ*', 'ptyR*', 'ptyS*', 'ptyl*',
         'ptym*', 'ptyn*', 'ptyo*', 'ptyL*', 'ptyM*', 'ptyN*', 'ptyO*', 'ttyp*',
@@ -853,9 +854,8 @@ def _generate_devfs_ruleset(
     # We set these up by default above
     skip_includes = ['$devfsrules_hide_all', '$devfsrules_unhide_basic',
                      '$devfsrules_unhide_login']
-    if includes is not None:
-        devfs_includes = [include for include in includes if include not in
-                          skip_includes]
+    rules = [['include', name] for name in includes or ()
+             if name not in skip_includes]
 
     if paths is not None:
         devfs_dict.update(paths)
@@ -868,31 +868,13 @@ def _generate_devfs_ruleset(
     if check_truthy(conf['allow_tun']):
         devfs_dict['tun*'] = None
 
-    for include in devfs_includes:
-        su.run(
-            ['devfs', 'rule', '-s', ruleset, 'add', 'include', include],
-            stdout=su.PIPE
-        )
-
     for path, mode in devfs_dict.items():
-        # # Default hide all
         if path == 'hide':
-            su.run(
-                ['devfs', 'rule', '-s', ruleset, 'add', 'hide'],
-                stdout=su.PIPE
-            )
-            continue
-
-        path = ['add', 'path', path]
-
-        if mode is not None:
-            path += [mode]
+            rules.append(['hide'])
         else:
-            path += ['unhide']
+            rules.append(['path', path, 'unhide' if mode is None else mode])
 
-        su.run(['devfs', 'rule', '-s', ruleset] + path, stdout=su.PIPE)
-
-    return (False, configured_ruleset, ruleset)
+    return rules
 
 
 def runscript(script, custom_env=None):
@@ -1099,12 +1081,10 @@ def gen_nat_ip(ip_prefix, used_ips=None):
     The host and jail addresses must both remain unavailable to other workers
     until they appear on the host. Reservations stay for the entire batch.
     """
-    # Kernel scans may overlap; only selection and reservation need the lock.
-    inuse = set(get_used_ips())
-
+    inuse = used_ips if used_ips is not None else set()
     with ADDRESS_LOCK:
-        if used_ips is not None:
-            inuse.update(used_ips)
+        # An in-flight hook can add an address inside a peer's VNET.
+        inuse.update(get_used_ips())
 
         for i in range(256):
             for j in range(1, 256, 4):
@@ -1116,9 +1096,7 @@ def gen_nat_ip(ip_prefix, used_ips=None):
                 if any(ip in inuse for ip in pair):
                     continue
 
-                if used_ips is not None:
-                    used_ips.update(pair)
-
+                inuse.update(pair)
                 return pair
 
     logit(
@@ -1130,33 +1108,33 @@ def gen_nat_ip(ip_prefix, used_ips=None):
     )
 
 
+def get_host_ips():
+    output = su.check_output(['ifconfig'], text=True)
+    return [line.split()[1] for line in output.splitlines()
+            if line.strip().startswith('inet')]
+
+
 def get_used_ips():
-    """
-    Run ifconfig in every jail and return an iteratable of the inuse addresses
-    """
-    jails = json.loads(
-        su.run(
-            ['jls', 'jid', '--libxo', 'json'], stdout=su.PIPE, stderr=su.PIPE
-        ).stdout
-    )['jail-information']['jail']
-    addresses = []
-
-    # Host
-    inuse = su.run(
-        ['ifconfig'], stdout=su.PIPE, stderr=su.PIPE, universal_newlines=True
+    """Read live host and jail addresses, including isolated VNET stacks."""
+    inventory = su.check_output(
+        ['jls', '--libxo', 'json', 'jid', 'vnet', 'ip4.addr', 'ip6.addr']
     )
-    for line in inuse.stdout.splitlines():
-        if line.strip().startswith('inet'):
-            address = line.split()[1]
-            addresses.append(address)
+    addresses = get_host_ips()
+    vnets = []
+    for jail in json.loads(inventory)['jail-information']['jail']:
+        addresses.extend(jail['ip4.addr'])
+        addresses.extend(jail['ip6.addr'])
+        if jail['vnet'] == 'new':
+            vnets.append(str(jail['jid']))
 
-    # Jails
+    # Only VNET addresses are missing from jls. Read those stacks from the
+    # host so a jail can still be starting or have an empty root filesystem.
     with concurrent.futures.ThreadPoolExecutor() as exc:
         futures = exc.map(
-            lambda jail: su.run(
-                ['jexec', jail['jid'], 'ifconfig'], stdout=su.PIPE,
+            lambda jid: su.run(
+                ['ifconfig', '-j', jid, '-a'], stdout=su.PIPE,
                 stderr=su.PIPE, universal_newlines=True
-            ), jails
+            ), vnets
         )
 
         for future in futures:
@@ -1278,74 +1256,105 @@ def retrieve_ip4_for_jail(conf, jail_running):
     return {'short_ip4': short_ip4, 'full_ip4': full_ip4}
 
 
-def retrieve_admin_portals(
-    conf, jail_running, admin_portal, default_gateways=None, full_ipv4_dict=None
-):
-    # We want to ensure that we show the correct NAT ports for nat based plugins and when NAT
-    # isn't desired, we don't show them at all. In all these variable values, what persists across
-    # NAT/DHCP/Static ip based plugins is that the internal ports of the jail don't change. For
-    # example if a plugin jail has nginx running on port 4000, it will still want to have it
-    # running on 4000 regardless of the fact how user configures to start the plugin jail. We
-    # take this fact, and search for an explicit specified port number in the admin portal, if
-    # none is found, that means that it is ( 80 - default for http ).
+def _nat_port_range(value):
+    first, _, last = value.partition('-')
+    first, last = int(first), int(last or first)
+    if not 1 <= first <= last <= 65535:
+        raise ValueError(f'Invalid NAT port range: {value}')
+    return range(first, last + 1)
 
-    nat_forwards_dict = {}
-    nat_forwards = conf.get('nat_forwards', 'none')
-    for rule in nat_forwards.split(',') if nat_forwards != 'none' else ():
-        # Rule can be proto(port), proto(in/out), port
-        if rule.isdigit():
-            jail = host = rule
-        else:
-            rule = rule.split('(')[-1].strip(')')
-            if ':' in rule:
-                jail, host = rule.split(':')
-            else:
-                # only one port provided
-                jail = host = rule
 
-        nat_forwards_dict[int(jail)] = int(host)
+def parse_nat_forwards(value):
+    """Return (protocol, jail ports, host ports) for each forwarding rule."""
+    if value == 'none':
+        return []
 
-    if not conf.get('nat'):
-        full_ipv4_dict = full_ipv4_dict or retrieve_ip4_for_jail(conf, jail_running)
-        full_ip4 = full_ipv4_dict['full_ip4'] or conf.get('ip4_addr', '')
-        all_ips = map(
-            lambda v: 'DHCP' if 'dhcp' in v.lower() else v,
-            [i.split('|')[-1].split('/')[0].strip() for i in full_ip4.split(',')]
-        )
+    rules = []
+    used = {'tcp': set(), 'udp': set()}
+    ports = r'([0-9]{1,5}(?:-[0-9]{1,5})?)'
+    for entry in value.split(','):
+        # A bare port forwards TCP on the same host and jail port.
+        if entry.isdecimal():
+            entry = f'tcp({entry})'
+        match = re.fullmatch(rf'(tcp|udp|tcp/udp)\({ports}(?::{ports})?\)',
+                             entry)
+        if not match:
+            raise ValueError(f'Invalid NAT forwarding rule: {entry}')
+
+        protocols, jail, host = match.groups()
+        jail = _nat_port_range(jail)
+        host = _nat_port_range(host) if host else jail
+        if len(jail) != len(host):
+            raise ValueError(f'NAT port ranges must have equal size: {entry}')
+
+        for protocol in protocols.split('/'):
+            if not used[protocol].isdisjoint(host):
+                raise ValueError(f'Overlapping NAT forwarding ports: {entry}')
+            used[protocol].update(host)
+            rules.append((protocol, jail, host))
+    return rules
+
+
+def retrieve_admin_portals(conf, jail_running, admin_portal,
+                           default_gateways=None, full_ipv4_dict=None,
+                           active_nat=None):
+    """Resolve plugin URLs using applied settings until the jail restarts."""
+    if jail_running:
+        if active_nat is None:
+            from iocage_lib import ioc_nat
+            active_nat = ioc_nat.portal_records(get_active_jails())
+        name = 'ioc-' + conf['host_hostuuid'].replace('.', '_')
+        settings = active_nat.get(name)
+        if (settings is None and name in active_nat
+                and check_truthy(conf.get('nat'))):
+            raise iocage_lib.ioc_exceptions.CommandNeedsRoot(
+                'Admin Portal requires root')
+    elif conf.get('nat'):
+        settings = {'forwards': conf.get('nat_forwards', 'none'),
+                    'interface': conf.get('nat_interface', 'none')}
     else:
-        default_gateways = default_gateways or iocage_lib.ioc_common.get_host_gateways()
+        settings = None
 
-        # We should list out the ips based on nat_interface property because that's the one which
-        # the firewall will be handling port forwarding on TODO: pf/ipfw only do port forwarding
-        # for the first ip address, we should update that so it works for all aliases. However
-        # there doesn't seem to be a good way apart from hardcoding the ip aliases, we use the
-        # dynamic option provided by the firewalls but that doesn't seem to take care of aliases,
-        # only the first ip if it changes address - if we hardcode, that would mean applying
-        # the firewall rules again on ip changes
-        nat_iface = conf.get('nat_interface', 'none')
-        all_ips = [
-            f['addr'] for k in default_gateways if default_gateways[k]['interface']
-            for f in netifaces.ifaddresses(
-                default_gateways[k]['interface'] if nat_iface == 'none' else nat_iface
-            )[netifaces.AF_INET if k == 'ipv4' else netifaces.AF_INET6]
-        ] if nat_iface in netifaces.interfaces() or nat_iface == 'none' else []
-        if all_ips:
-            all_ips = [all_ips[0]]
+    if settings is None:
+        ip_info = full_ipv4_dict or retrieve_ip4_for_jail(conf, jail_running)
+        full_ip4 = ip_info['full_ip4'] or conf.get('ip4_addr', '')
+        all_ips = [ip.split('|')[-1].split('/')[0].strip()
+                   for ip in full_ip4.split(',')]
+        all_ips = ['DHCP' if 'dhcp' in ip.lower() else ip for ip in all_ips]
+    else:
+        forwards = parse_nat_forwards(settings['forwards'])
+        interface = settings['interface']
+        if interface == 'none':
+            gateways = default_gateways or get_host_gateways()
+            interface = gateways['ipv4']['interface']
+        all_ips = []
+        if interface in netifaces.interfaces():
+            # Both backends forward to the first IPv4 address on the interface.
+            addresses = netifaces.ifaddresses(interface).get(netifaces.AF_INET)
+            if addresses:
+                all_ips.append(addresses[0]['addr'])
 
     admin_portals = []
     for portal in admin_portal.split(','):
-        if conf.get('nat'):
+        uri = portal
+        if settings is not None:
             portal_uri = urllib.parse.urlparse(portal)
-            portal_port = portal_uri.port or 80
-            # We do this safely as it's possible dev hasn't added it to plugin's json yet
-            nat_port = nat_forwards_dict.get(portal_port)
-            if nat_port:
-                uri = portal_uri._replace(netloc=f'{portal_uri._hostinfo[0]}:{nat_port}').geturl()
-            else:
-                uri = portal
-        else:
-            uri = portal
-        admin_portals.append(','.join(map(lambda v: uri.replace('%%IP%%', v), all_ips)))
+            portal_port = portal_uri.port or (
+                443 if portal_uri.scheme == 'https' else 80
+            )
+            # If several TCP forwards reach this port, the last one wins.
+            for proto, jail_ports, host_ports in reversed(forwards):
+                if proto == 'tcp' and portal_port in jail_ports:
+                    offset = portal_port - jail_ports.start
+                    # .hostname would lowercase the %%IP%% placeholder.
+                    host = portal_uri._hostinfo[0]
+                    uri = portal_uri._replace(
+                        netloc=f'{host}:{host_ports.start + offset}'
+                    ).geturl()
+                    break
+        admin_portals.append(','.join(
+            uri.replace('%%IP%%', address) for address in all_ips
+        ))
 
     return admin_portals
 

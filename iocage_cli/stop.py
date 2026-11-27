@@ -76,7 +76,7 @@ def cli(rc, force, jails, ignore, parallel, jobs):
         if 'ALL' in jails and len(jails) != 1:
             raise click.UsageError('ALL cannot be combined with jail names')
 
-        ioc.IOCage(rc=rc, silent=rc).stop(
+        ioc.IOCage(rc=rc, silent=rc, skip_jails=True).stop(
             force=force, ignore_exception=ignore, parallel=True,
             jobs=jobs, jails=jails or None
         )

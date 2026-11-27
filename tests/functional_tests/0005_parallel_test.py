@@ -23,13 +23,21 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """Real priority barriers on a disposable FreeBSD jail host and pool."""
+import ipaddress
+import re
 import subprocess
 import sys
 import uuid
 
+from unittest import mock
+
 import pytest
 
+from iocage_lib import ioc_common, ioc_nat
 from iocage_lib.ioc_list import IOCList
+from iocage_lib.ioc_start import IOCStart
+from iocage_lib.ioc_stop import IOCStop
+from iocage_lib.iocage import IOCage
 
 pytestmark = [pytest.mark.require_root, pytest.mark.require_zpool]
 
@@ -38,22 +46,17 @@ pytestmark = [pytest.mark.require_root, pytest.mark.require_zpool]
 def parallel_jails(release, invoke_cli, tmp_path):
     names = [f'parallel_{uuid.uuid4().hex[:8]}_{n}' for n in range(4)]
     hook = tmp_path / 'mark.py'
-    mode = tmp_path / 'mode'
-    mode.write_text('parallel')
-    # Host hooks rendezvous with the other jail at the same priority. A timeout
-    # makes missing overlap fail instead of leaving a blocked lifecycle hook.
+    # Tests that require overlap ask each hook to wait for its same-priority
+    # peer. A timeout turns a missing peer into a test failure.
     hook.write_text('''import pathlib
 import sys
 import time
 
 directory = pathlib.Path(sys.argv[1])
-name, action, phase = sys.argv[2:]
-names = (directory / 'names').read_text().splitlines()
+name, peer, action, phase = sys.argv[2:]
 (directory / f'{name}.{action}.{phase}').write_text(str(time.monotonic_ns()))
 if phase == 'begin':
-    if (directory / 'mode').read_text() == 'parallel':
-        # Adjacent entries are the pairs at priorities 10 and 20.
-        peer = names[names.index(name) ^ 1]
+    if (directory / 'wait-for-peer').exists():
         marker = directory / f'{peer}.{action}.begin'
         deadline = time.monotonic() + 30
         while not marker.exists():
@@ -61,14 +64,17 @@ if phase == 'begin':
                 sys.exit('Peer hook did not overlap')
             time.sleep(0.05)
     else:
+        # Give an unexpected overlap time to show up in the single-worker test.
         time.sleep(0.1)
 ''')
-    (tmp_path / 'names').write_text('\n'.join(names))
     created = []
 
     try:
-        for index, name in enumerate(names):
-            props = ['boot=off', f'priority={10 if index < 2 else 20}',
+        for name, peer, priority in (
+            (names[0], names[1], 10), (names[1], names[0], 10),
+            (names[2], names[3], 20), (names[3], names[2], 20),
+        ):
+            props = ['boot=off', f'priority={priority}',
                      'ip4_addr=none', 'ip6_addr=none', 'vnet=off',
                      'exec_start=/usr/bin/true', 'exec_stop=/usr/bin/true']
 
@@ -80,13 +86,16 @@ if phase == 'begin':
             ):
                 props.append(
                     f'{property_name}={sys.executable} {hook} {tmp_path} '
-                    f'{name} {action} {phase}'
+                    f'{name} {peer} {action} {phase}'
                 )
 
             created.append(name)
             invoke_cli(['create', '-r', release, '-n', name, *props])
 
-        yield names, tmp_path, mode
+        # The CLI creates these datasets in separate processes. Refresh the
+        # inventory before exercising library calls in the pytest process.
+        IOCage.reset_cache()
+        yield names, tmp_path
     finally:
         # Cleanup must bypass the hooks, even when a synchronization test fails.
         for name in created:
@@ -102,25 +111,24 @@ def events(directory, name, action):
 
 
 def assert_priority_events(names, directory, action, parallel):
-    first, second = (names[:2], names[2:]) if action == 'start' else (
-        names[2:], names[:2]
-    )
-    assert max(events(directory, n, action)[1] for n in first) < min(
-        events(directory, n, action)[0] for n in second
-    )
+    first = [events(directory, name, action) for name in names[:2]]
+    second = [events(directory, name, action) for name in names[2:]]
+    if action == 'stop':
+        first, second = second, first
+    assert max(end for _, end in first) < min(begin for begin, _ in second)
 
     for group in (first, second):
-        a, b = [events(directory, n, action) for n in group]
-        overlap = max(a[0], b[0]) < min(a[1], b[1])
-        assert overlap is parallel
+        last_begin = max(begin for begin, _ in group)
+        first_end = min(end for _, end in group)
+        assert (last_begin < first_end) is parallel
 
 
 @pytest.mark.parametrize('jobs', [None, 1, 2])
 def test_parallel_priority_barriers(parallel_jails, invoke_cli, jobs):
-    names, directory, mode = parallel_jails
+    names, directory = parallel_jails
 
-    if jobs == 1:
-        mode.write_text('serial')
+    if jobs != 1:
+        (directory / 'wait-for-peer').touch()
 
     options = ['--parallel'] + (['--jobs', str(jobs)] if jobs else [])
 
@@ -133,8 +141,7 @@ def test_parallel_priority_barriers(parallel_jails, invoke_cli, jobs):
 
 
 def test_parallel_dependencies_and_force(parallel_jails, invoke_cli):
-    names, directory, mode = parallel_jails
-    mode.write_text('serial')
+    names, directory = parallel_jails
     invoke_cli(['set', f'depends={names[0]}', names[1]])
     invoke_cli(['start', '--parallel', *names])
     assert events(directory, names[0], 'start')[1] < events(
@@ -151,8 +158,7 @@ def test_parallel_dependencies_and_force(parallel_jails, invoke_cli):
 def test_parallel_failed_hook_blocks_later_priority(
     parallel_jails, invoke_cli, ignore
 ):
-    names, directory, mode = parallel_jails
-    mode.write_text('serial')
+    names, directory = parallel_jails
     failure = directory / 'fail.sh'
     failure.write_text('#!/bin/sh\necho injected-failure >&2\nexit 1\n')
     failure.chmod(0o755)
@@ -184,8 +190,63 @@ def test_parallel_failed_hook_blocks_later_priority(
         assert (directory / f'{name}.start.begin').exists() is ignore
 
 
+def test_failed_jail_creation_releases_devfs_ruleset(
+    parallel_jails, invoke_cli
+):
+    names, directory = parallel_jails
+    name = names[0]
+    # Move only this fixture jail's generated config after preflight, so its
+    # hook succeeds but jail -c fails before it can claim the ruleset.
+    runtime = f'/var/run/jail.ioc-{name}.conf'
+    saved = directory / 'generated.conf'
+    invoke_cli(['set', f'exec_prestart=/bin/mv {runtime} {saved}',
+                'devfs_ruleset=0', name])
+    result = invoke_cli(['start', '--parallel', name], assert_returncode=False)
+    assert saved.is_file()
+    assert result.returncode != 0
+    assert b'Start FAILED' in result.stderr
+    assert not IOCList.list_get_jid(name)[0]
+    # Read the actual reservation so unrelated host rulesets can change.
+    ruleset = re.search(r'devfs_ruleset = "(\d+)";', saved.read_text())
+    assert ruleset, 'Expected a devfs ruleset in the generated jail config'
+    remaining = subprocess.check_output(['devfs', 'rule', 'showsets'],
+                                        text=True)
+    assert ruleset.group(1) not in remaining.splitlines()
+
+
+def test_setup_failure_cleans_up_before_retrying_dependencies(
+    parallel_jails, invoke_cli, monkeypatch
+):
+    names, directory = parallel_jails
+    prerequisite, dependent = names[:2]
+    invoke_cli(['set', f'depends={prerequisite}', dependent])
+    created = []
+
+    def fail_after_creation(jail):
+        created.append(jail._created_jid)
+        raise RuntimeError('resolver setup failed')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(IOCStart, 'start_generate_resolv', fail_after_creation)
+        with pytest.raises(RuntimeError, match='resolver setup failed'):
+            IOCage(jail=dependent).start(parallel=True)
+    assert len(created) == 1 and created[0].isdigit()
+    assert not IOCList.list_get_jid(prerequisite)[0]
+    assert not (directory / f'{dependent}.start.begin').exists()
+
+    invoke_cli(['start', '--parallel', dependent])
+    assert events(directory, prerequisite, 'start')[1] < events(
+        directory, dependent, 'start'
+    )[0]
+    worker = IOCage(jail=prerequisite)
+    uuid, path = worker.__check_jail_existence__()
+    IOCStop(uuid, path, force=True, expected_jid=created[0])
+    assert IOCList.list_get_jid(prerequisite)[0]
+
+
 def test_parallel_boot_selection(parallel_jails, invoke_cli):
-    names, _, _ = parallel_jails
+    names, directory = parallel_jails
+    (directory / 'wait-for-peer').touch()
 
     for name in names[:2]:
         invoke_cli(['set', 'boot=on', name])
@@ -205,7 +266,8 @@ def test_parallel_boot_selection(parallel_jails, invoke_cli):
 
 
 def test_parallel_empty_devfs_rulesets(parallel_jails, invoke_cli):
-    names, _, _ = parallel_jails
+    names, directory = parallel_jails
+    (directory / 'wait-for-peer').touch()
 
     for name in names:
         invoke_cli(['set', 'devfs_ruleset=0', name])
@@ -225,23 +287,56 @@ def test_parallel_empty_devfs_rulesets(parallel_jails, invoke_cli):
     assert not rulesets.intersection(remaining)
 
 
+def installed_nat_rules(invoke_cli):
+    backend = invoke_cli(['get', 'nat_backend', 'default']).output.strip()
+    command = (['pfctl', '-a', ioc_nat.PF_ANCHOR, '-P', '-sn']
+               if backend == 'pf' else
+               ['ipfw', 'nat', 'show', 'config'])
+    return backend, subprocess.check_output(command, text=True)
+
+
 @pytest.mark.require_nat
 def test_parallel_vnet_nat_allocations_and_cleanup(
     parallel_jails, invoke_cli, ping_ip
 ):
-    names, _, _ = parallel_jails
+    names, directory = parallel_jails
+    (directory / 'wait-for-peer').touch()
 
     for index, name in enumerate(names):
+        protocol = 'tcp/udp' if index == 0 else 'tcp'
         invoke_cli(['set', 'vnet=on', 'nat=on',
-                    f'nat_forwards=tcp(80:{18080 + index})', name])
+                    f'nat_forwards={protocol}(80:{18080 + index})', name])
 
-    invoke_cli(['start', '--parallel', *names])
+    invoke_cli(['start', '--parallel', *names[:2]])
+    # Editing a running jail takes effect on restart. Its current forward
+    # must survive both preflight and the next successful firewall reload.
+    invoke_cli(['set', 'nat_forwards=none', names[0]])
+    invoke_cli(['set', 'nat_forwards=tcp(80:18080)', names[2]])
+    conflict = invoke_cli(['start', '--parallel', names[2]],
+                          assert_returncode=False)
+    assert conflict.returncode != 0
+    assert b'NAT forwarding ports conflict' in conflict.stderr
+    assert not IOCList.list_get_jid(names[2])[0]
+    invoke_cli(['set', 'nat_forwards=tcp(80:18082)', names[2]])
+    invoke_cli(['start', '--parallel', *names[2:]])
     addresses = []
     rulesets = []
     interfaces = []
+    backend, nat_rules = installed_nat_rules(invoke_cli)
 
-    for name in names:
-        addresses.append(invoke_cli(['get', 'ip4_addr', name]).output.strip())
+    for index, name in enumerate(names):
+        configured = invoke_cli(['get', 'ip4_addr', name]).output.strip()
+        address = configured.split('|')[-1].split('/')[0]
+        addresses.append(address)
+        port = 18080 + index
+        for protocol in ('tcp', 'udp') if index == 0 else ('tcp',):
+            if backend == 'pf':
+                mapping = f'port = {port} -> {address} port 80'
+                assert any(f'proto {protocol} ' in line and mapping in line
+                           for line in nat_rules.splitlines())
+            else:
+                assert f'redirect_port {protocol} {address}:80 {port}' in (
+                    nat_rules)
         rulesets.append(
             invoke_cli(['get', 'devfs_ruleset', name]).output.strip()
         )
@@ -251,6 +346,8 @@ def test_parallel_vnet_nat_allocations_and_cleanup(
     assert len(set(addresses)) == len(names)
     assert len(set(rulesets)) == len(names)
     invoke_cli(['stop', '--parallel', *names])
+    _, remaining_forwards = installed_nat_rules(invoke_cli)
+    assert all(str(p) not in remaining_forwards for p in range(18080, 18084))
     remaining_sets = subprocess.check_output(
         ['devfs', 'rule', 'showsets'], text=True
     ).splitlines()
@@ -262,3 +359,47 @@ def test_parallel_vnet_nat_allocations_and_cleanup(
 
     for name in names:
         assert not IOCList.list_get_jid(name)[0]
+
+
+@pytest.mark.require_nat
+def test_failed_nat_start_restores_peer_and_can_retry(
+    parallel_jails, invoke_cli, ping_ip, monkeypatch
+):
+    names, _ = parallel_jails
+    peer, new = names[:2]
+    for name, forward in [(peer, '80-82:18080-18082'), (new, '80:18083')]:
+        invoke_cli(['set', 'vnet=on', 'nat=on',
+                    f'nat_forwards=tcp({forward})', name])
+
+    invoke_cli(['start', peer])
+    backend, previous_nat = installed_nat_rules(invoke_cli)
+    assert {18080, 18081, 18082}.issubset(ioc_nat.running_ports())
+
+    # Reserve the peer's /24 so this start must replace the outbound routes.
+    addr = invoke_cli(['get', 'ip4_addr', peer]).output.strip().split('|')[-1]
+    subnet = ipaddress.ip_interface(addr).network.supernet(new_prefix=24)
+    occupied = list(ioc_common.get_used_ips()) + [str(ip) for ip in subnet]
+    if backend == 'ipfw':
+        list_rules = ['ipfw', '-S', 'list']
+        previous_routes = subprocess.check_output(list_rules)
+
+    # Fail after the kernel has accepted the new rules, so both the rollback
+    # and the cleanup of the just-created jail run against real resources.
+    with monkeypatch.context() as patch:
+        patch.setattr(ioc_common, 'get_used_ips', lambda: occupied)
+        patch.setattr(ioc_nat.os, 'replace',
+                      mock.Mock(side_effect=OSError('could not publish state')))
+        with pytest.raises(OSError, match='could not publish state'):
+            IOCage(jail=new, silent=True).start()
+
+    assert not IOCList.list_get_jid(new)[0]
+    assert installed_nat_rules(invoke_cli) == (backend, previous_nat)
+    if backend == 'ipfw':
+        assert subprocess.check_output(list_rules) == previous_routes
+    invoke_cli(['exec', peer, 'ping', '-c', '1', ping_ip])
+    invoke_cli(['start', new])
+    invoke_cli(['exec', new, 'ping', '-c', '1', ping_ip])
+    invoke_cli(['stop', new])
+    _, remaining = installed_nat_rules(invoke_cli)
+    assert '18083' not in remaining and '18080' in remaining
+    invoke_cli(['exec', peer, 'ping', '-c', '1', ping_ip])

@@ -24,6 +24,7 @@
 
 """Concurrency tests use synchronization rather than elapsed-time guesses."""
 import concurrent.futures
+import queue
 import threading
 
 import pytest
@@ -232,33 +233,30 @@ def test_invalid_worker_limits(jobs):
         IOCParallel({}, 'start', lambda name: None, jobs=jobs)
 
 
-@pytest.mark.parametrize('target', ['a', 'c'])
+@pytest.mark.parametrize('target, expected', [
+    ('a', ['a']),
+    ('c', ['a', 'b', 'c']),
+])
 def test_interruption_waits_for_active_workers_and_admits_no_more(
-    monkeypatch, target
+    monkeypatch, target, expected
 ):
-    active = threading.Event()
+    started = queue.Queue()
     release = threading.Event()
     finished = threading.Event()
     calls = []
-    wait_count = 0
     real_wait = concurrent.futures.wait
 
     def worker(name):
         calls.append(name)
-
+        started.put(name)
         if name == target:
-            active.set()
             assert release.wait(timeout=5)
             finished.set()
 
     def interrupt(*args, **kwargs):
-        nonlocal wait_count
-        wait_count += 1
-
-        if wait_count != (1 if target == 'a' else 3):
+        # With one worker, each wait corresponds to the jail that just started.
+        if started.get(timeout=5) != target:
             return real_wait(*args, **kwargs)
-
-        assert active.wait(timeout=5)
         release.set()
         raise KeyboardInterrupt
 
@@ -271,5 +269,5 @@ def test_interruption_waits_for_active_workers_and_admits_no_more(
             'start', worker, jobs=1
         ).run()
 
-    assert calls == (['a'] if target == 'a' else ['a', 'b', 'c'])
+    assert calls == expected
     assert finished.is_set()

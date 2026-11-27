@@ -41,6 +41,7 @@ import iocage_lib.ioc_exec as ioc_exec
 import iocage_lib.ioc_fstab as ioc_fstab
 import iocage_lib.ioc_json as ioc_json
 import iocage_lib.ioc_list as ioc_list
+import iocage_lib.ioc_nat as ioc_nat
 import iocage_lib.ioc_parallel as ioc_parallel
 import iocage_lib.ioc_start as ioc_start
 import iocage_lib.ioc_stop as ioc_stop
@@ -1845,6 +1846,9 @@ class IOCage:
         Return a jail-to-error mapping, raising on failure unless ignored.
         """
         if parallel:
+            if jail is not None:
+                raise ValueError('Use jails=[name] with parallel=True')
+
             return self.__parallel__(
                 'start', jails, jobs, ignore_exception, used_ports=used_ports
             )
@@ -1860,7 +1864,7 @@ class IOCage:
 
     def __start_jail__(self, jail=None, ignore_exception=False,
                        used_ports=None, start_dependencies=True,
-                       used_ips=None):
+                       used_ips=None, reserved_ports=None):
         """Run the existing lifecycle after optional dependency startup."""
         uuid, path = self.__check_jail_existence__()
         conf = ioc_json.IOCJson(path, silent=self.silent).json_get_value(
@@ -1898,6 +1902,7 @@ class IOCage:
                 suppress_exception=ignore_exception,
                 used_ports=used_ports,
                 used_ips=used_ips,
+                reserved_ports=reserved_ports,
             )
 
             return False, None
@@ -1923,6 +1928,9 @@ class IOCage:
         Return a jail-to-error mapping, raising on failure unless ignored.
         """
         if parallel:
+            if jail is not None:
+                raise ValueError('Use jails=[name] with parallel=True')
+
             return self.__parallel__(
                 'stop', jails, jobs, ignore_exception, force=force
             )
@@ -1978,20 +1986,21 @@ class IOCage:
                     worker = records[name]['worker']
                     status, _ = worker.list('jid', uuid=name)
 
-                    if status != starting:
-                        if starting:
-                            # The coordinator has satisfied dependencies;
-                            # recursive startup here would dispatch them twice.
-                            error, message = worker.__start_jail__(
-                                name, used_ports=reserved_ports.get(name),
-                                start_dependencies=False,
-                                used_ips=reserved_ips
-                            )
+                    if status == starting:
+                        return
 
-                            if error:
-                                raise RuntimeError(message)
-                        else:
-                            worker.stop(force=force)
+                    if starting:
+                        # The coordinator already satisfied the dependencies.
+                        error, message = worker.__start_jail__(
+                            name, start_dependencies=False,
+                            used_ips=reserved_ips,
+                            reserved_ports=reserved_ports.get(name)
+                        )
+
+                        if error:
+                            raise RuntimeError(message)
+                    else:
+                        worker.stop(force=force)
 
                     # Some lifecycle failures return early instead of raising.
                     # Confirm the final state before satisfying dependents.
@@ -2003,7 +2012,7 @@ class IOCage:
             scheduler = ioc_parallel.IOCParallel(
                 records, action, operate, jobs=jobs, ignore=ignore_exception
             )
-        except ValueError as error:
+        except (ValueError, su.CalledProcessError) as error:
             # Invalid selections or dependency/resource plans remain fatal,
             # even when --ignore allows individual lifecycle failures.
             ioc_common.logit({
@@ -2052,14 +2061,15 @@ class IOCage:
         bulk = self.rc or selected == ['ALL']
 
         if bulk:
-            if self.skip_jails:
-                self.jails = self.list('uuid')
-
-            selected = list(self.jails)
+            # A library instance can outlive changes to the ZFS datasets.
+            self.reset_cache()
+            self.jails = self.list('uuid')
+            selected = self.jails
         elif not selected:
             raise ValueError('Select jail names, ALL, or --rc')
 
         records = {}
+        active_jails = ioc_common.get_active_jails() if selected else {}
 
         def resolve(name, boot_only=False, bulk_selection=False):
             if name in records:
@@ -2087,12 +2097,21 @@ class IOCage:
             if boot_only and not ioc_common.check_truthy(conf['boot']):
                 return None
 
-            running, _ = worker.list('jid', uuid=uuid)
+            running = f"ioc-{uuid.replace('.', '_')}" in active_jails
 
             if action == 'start' and not running:
                 error, message = self.__check_jail_type__(conf['type'], uuid)
 
                 if error:
+                    # ALL and --rc may encounter old, unrelated jails.
+                    # Explicit names and dependencies must still be startable.
+                    if bulk_selection:
+                        ioc_common.logit({
+                            'level': 'ERROR',
+                            'message': f'Skipping {uuid}: {message}'
+                        }, _callback=self.callback)
+                        return None
+
                     raise ValueError(message)
 
             # Register before recursion to deduplicate shared prerequisites
@@ -2124,7 +2143,12 @@ class IOCage:
 
         for record in records.values():
             conf = record['config']
-            configured = [conf.get('localhost_ip', 'none')]
+            configured = []
+            # Thick VNET configs can store a disabled localhost address as 0.
+            if not conf.get('vnet') and conf.get('assign_localhost'):
+                localhost = conf.get('localhost_ip')
+                if localhost:
+                    configured.append(localhost)
 
             if not conf['nat']:
                 configured.extend(conf.get('ip4_addr', 'none').split(','))
@@ -2145,44 +2169,29 @@ class IOCage:
         """Reserve forwarding ports before simultaneous starts can race."""
         pending = {}
 
-        def ports(conf):
-            return {
-                int(mapping)
-                for _, _, mapping in ioc_start.IOCStart.__parse_nat_fwds__(
-                    conf['nat_forwards']
-                )
-            }
-
         for name, record in records.items():
             if not record['running']:
                 conf = record['config']
 
-                if conf['nat'] and conf['nat_forwards'] != 'none':
-                    pending[name] = ports(conf)
+                if conf['nat']:
+                    pending[name] = ioc_nat.forward_ports(
+                        conf['nat_forwards']
+                    )
 
         if not pending:
             return {}
 
         occupied = set(used_ports or ())
-        running = ioc_common.get_jails_with_config(
-            lambda conf: conf['state'] == 'up' and conf['nat'] and
-            conf['nat_forwards'] != 'none'
-        )
-
-        for conf in running.values():
-            occupied.update(ports(conf))
+        occupied.update(ioc_nat.running_ports())
 
         for name, forwarded in pending.items():
-            if occupied.intersection(forwarded):
+            if not occupied.isdisjoint(forwarded):
                 raise ValueError(f'{name}: NAT forwarding ports conflict')
 
             occupied.update(forwarded)
 
-        # A worker must not see its own reserved ports as a conflict.
-        return {
-            name: occupied.difference(forwarded)
-            for name, forwarded in pending.items()
-        }
+        # Keep each port only with its owner once conflicts have been checked.
+        return pending
 
     def update_all(self, pkgs=False):
         """Runs update for all jails"""

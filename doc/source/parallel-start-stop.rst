@@ -20,9 +20,9 @@ Named jails are resolved and deduplicated before dispatch. Their priorities,
 rather than argument order, determine parallel execution order. Do not combine
 ``ALL`` with names or ``--rc`` with names. Already-running starts and
 already-stopped stops are skipped. An empty boot selection succeeds.
-Templates are excluded from ``ALL`` and ``--rc`` selections. Starting an
-explicitly named template or requiring one through ``depends`` remains a
-preflight error.
+Templates are excluded from ``ALL`` and ``--rc`` selections. Bulk starts also
+log and skip stopped jails with unsupported types. Selecting one by name or
+requiring it as a stopped dependency fails preflight.
 
 Dependencies and failures
 -------------------------
@@ -32,13 +32,15 @@ selected or have ``boot=off``. Shared prerequisites start once. A stopped
 prerequisite must have an earlier or equal priority; an already-running
 prerequisite is satisfied regardless of its priority. Same-priority dependents
 wait for their prerequisites to finish successfully. Missing prerequisites,
-cycles, unsupported startup types, and conflicting priorities fail preflight.
+cycles, and conflicting priorities fail preflight.
 
 If a start fails, the command completes other eligible operations in that group,
 skips failed dependents, and does not begin later groups. Stop attempts every
 group even when one jail fails. Failures are reported by jail name and produce a
 nonzero exit status. ``--ignore`` continues eligible work and suppresses the
 aggregate exception; preflight errors remain fatal.
+If setup fails after jail creation, iocage stops that jail instance so a retry
+runs the prerequisite's startup hooks before starting its dependents.
 
 The ``depends`` property controls startup only. Same-priority stops run
 together. Use different priorities when shutdown order matters. ``--force``
@@ -56,6 +58,35 @@ callbacks may execute on worker threads. Output from different jails can
 interleave; the final failure summary is sorted by jail name.
 An interruption stops admission and waits for submitted workers to settle; it
 does not undo successful jail operations.
+
+Shared NAT rules
+----------------
+
+Suppose ``web`` forwards host port 8080 and ``mail`` forwards 2525. If each
+built an update from the same old rules, the last write would drop the other
+jail's forward. Start and stop both use ``ioc_nat`` to read the applied
+mappings, add or remove one jail, and install the result under the same lock.
+Stopping ``web`` then releases 8080 while 2525 still reaches ``mail``.
+
+After a successful firewall update, iocage records each jail's ID (JID),
+IPv4 address, interface, and forwards under ``/var/run/iocage_nat``. Port
+checks, firewall reloads, and plugin portal URLs use these settings until
+a restart applies configuration edits. Install this version with NAT jails
+stopped. Shared rules such as PF's anchor hooks can remain installed after
+the last jail stops.
+
+PF keeps jail translations in the ``iocage-nat`` anchor and attaches it to
+the host ruleset on first use. PF jails can use different external interfaces.
+Before publishing forwards, iocage checks host redirects in the root ruleset
+and its reachable anchors, including rules that select an interface group.
+A conflicting redirect or host-owned rule in ``iocage-nat`` blocks startup.
+IPFW jails share NAT instance 462 and must use the same external interface.
+iocage labels its IPFW routes and leaves unrelated rules in place. If the
+host already uses instance 462, resolve that conflict before starting a NAT
+jail. Installed forwards stay reserved while their rule set is disabled.
+If stopping a jail would overwrite a host redirect, iocage reports the
+conflict before running the jail's shutdown hooks.
+Stopping a jail withdraws its forwards before its address can be reused.
 
 Boot and shutdown
 -----------------
@@ -86,8 +117,9 @@ The new functional tests create four disposable jails with priorities 10, 10,
 prove overlap. Tests cover whole-group execution, one/two workers, dependencies,
 force stop, boot selection, empty devfs clones, and injected failure
 with/without ``--ignore``.
-The optional NAT test checks distinct addresses/rulesets, connectivity, and
-interface/ruleset cleanup.
+The optional NAT tests check connectivity and the installed forwards while
+peers start, stop, and retry. They also check that stopping the last jail
+releases its forwards, interfaces, and ruleset.
 
 .. warning::
    Run functional tests on a disposable FreeBSD host and ZFS pool. The full
@@ -190,4 +222,4 @@ Test a controlled service stop/start before a reboot. Setting
 ``iocage_parallel=NO`` restores sequential scheduling in the branch. To restore
 the packaged implementation, restore the saved script and previous rc values,
 removing settings that were previously absent. Invoke ``/usr/local/bin/iocage``
-again. No jail configuration migration is introduced by this feature.
+again.

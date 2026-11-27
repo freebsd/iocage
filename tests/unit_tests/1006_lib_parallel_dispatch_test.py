@@ -26,8 +26,12 @@
 import importlib.util
 import logging
 import pathlib
+import subprocess
 import threading
 import time
+
+from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 
@@ -39,6 +43,7 @@ import iocage_lib.iocage as ioc
 
 @pytest.fixture
 def host(monkeypatch):
+    """Run each worker against the same jail inventory and record its calls."""
     configs = {}
     running = {}
     calls = []
@@ -49,7 +54,7 @@ def host(monkeypatch):
         configs[name] = {
             'priority': str(priority), 'boot': boot, 'depends': depends,
             'type': 'jail', 'release': 'EMPTY', 'nat': nat,
-            'nat_forwards': forwards
+            'nat_forwards': forwards, 'nat_backend': 'ipfw'
         }
         running[name] = up
 
@@ -91,8 +96,6 @@ def host(monkeypatch):
                      _callback=callback, silent=silent)
         running[name] = True
 
-    start.__parse_nat_fwds__ = ioc.ioc_start.IOCStart.__parse_nat_fwds__
-
     def stop(name, path, force=False, callback=None, silent=False, **kwargs):
         calls.append(('stop', name, {'force': force, **kwargs}))
 
@@ -103,89 +106,150 @@ def host(monkeypatch):
                      _callback=callback, silent=silent)
         running[name] = False
 
+    def list_jails(self, kind, uuid=None):
+        if kind == 'uuid':
+            return {name: name for name in configs}
+
+        assert kind == 'jid'
+        return running[uuid], '1'
+
     monkeypatch.setattr(common, 'INTERACTIVE', False)
+    monkeypatch.setattr(common, 'get_active_jails', lambda: {
+        f"ioc-{name.replace('.', '_')}": {'jid': 1}
+        for name, up in running.items() if up
+    })
     monkeypatch.setattr(ioc.IOCage, '__init__', initialize)
     monkeypatch.setattr(ioc.IOCage, '__check_jail_existence__', resolve)
-    monkeypatch.setattr(ioc.IOCage, 'list',
-                        lambda self, kind, uuid: (running[uuid], '1'))
+    monkeypatch.setattr(ioc.IOCage, 'list', list_jails)
     monkeypatch.setattr(ioc.ioc_json, 'IOCJson', Json)
     monkeypatch.setattr(ioc.ioc_start, 'IOCStart', start)
     monkeypatch.setattr(ioc.ioc_stop, 'IOCStop', stop)
-    monkeypatch.setattr(common, 'get_jails_with_config', lambda *args: {
-        name: {**conf, 'state': 'up'}
-        for name, conf in configs.items()
-        if running[name] and conf['nat'] and conf['nat_forwards'] != 'none'
+    monkeypatch.setattr(common, 'get_used_ips', lambda: [])
+    monkeypatch.setattr(ioc.ioc_nat, 'running_ports', lambda: {
+        port for name, conf in configs.items() if running[name] and conf['nat']
+        for port in ioc.ioc_nat.forward_ports(conf['nat_forwards'])
     })
-    return add, running, calls, hooks, configs
+    return SimpleNamespace(add=add, running=running, calls=calls,
+                           hooks=hooks, configs=configs)
 
 
 def test_names_are_resolved_deduplicated_and_sorted(host):
-    add, running, calls, _, _ = host
-    add('alpha', 20)
-    add('beta', 10)
+    host.add('alpha', 20)
+    host.add('beta', 10)
     parent = ioc.IOCage()
     assert parent.start(parallel=True, jails=['alpha', 'al', 'beta']) == {}
-    assert [call[1] for call in calls] == ['beta', 'alpha']
-    assert all(running.values())
+    assert [call[1] for call in host.calls] == ['beta', 'alpha']
+    assert all(host.running.values())
     assert parent.jail is None
 
 
 def test_boot_selection_includes_shared_off_prerequisites_once(host):
-    add, running, calls, _, _ = host
-    add('a', boot=True, depends='c')
-    add('b', boot=True, depends='c')
-    add('c', boot=False)
-    add('d', boot=False)
+    host.add('a', boot=True, depends='c')
+    host.add('b', boot=True, depends='c')
+    host.add('c', boot=False)
+    host.add('d', boot=False)
     ioc.IOCage(rc=True).start(parallel=True, jobs=1)
-    assert [call[1] for call in calls] == ['c', 'a', 'b']
-    assert running == {'a': True, 'b': True, 'c': True, 'd': False}
+    assert [call[1] for call in host.calls] == ['c', 'a', 'b']
+    assert host.running == {'a': True, 'b': True, 'c': True, 'd': False}
 
 
 def test_stop_rc_does_not_expand_dependencies(host):
-    add, running, calls, _, _ = host
-    add('a', boot=True, depends='b', up=True)
-    add('b', boot=False, up=True)
+    host.add('a', boot=True, depends='b', up=True)
+    host.add('b', boot=False, up=True)
     ioc.IOCage(rc=True).stop(parallel=True, force=True)
-    assert len(calls) == 1
-    assert calls[0][1:] == ('a', {
+    assert len(host.calls) == 1
+    assert host.calls[0][1:] == ('a', {
         'force': True, 'suppress_exception': False
     })
-    assert running == {'a': False, 'b': True}
+    assert host.running == {'a': False, 'b': True}
+
+
+@pytest.mark.parametrize('rc', [False, True])
+def test_reused_bulk_instance_refreshes_dataset_inventory(host, rc):
+    host.add('old', boot=True)
+    parent = ioc.IOCage(rc=rc, jail=None if rc else 'ALL')
+    parent.start(parallel=True)
+    del host.configs['old']
+    del host.running['old']
+    host.add('new', boot=True, up=True)
+
+    assert parent.stop(parallel=True) == {}
+    assert [name for _, name, _ in host.calls] == ['old', 'new']
+    assert not host.running['new']
+
+
+@pytest.mark.parametrize('stage', ['preflight', 'verification'])
+def test_stop_fails_when_kernel_state_is_unknown(host, monkeypatch, stage):
+    host.add('db', up=True)
+    stop_attempts = []
+    error = subprocess.CalledProcessError(1, ['jls'])
+
+    def inventory():
+        if stage == 'preflight' or stop_attempts:
+            raise error
+        return {'ioc-db': {'jid': 7}}
+
+    def lookup(command, **kwargs):
+        if stop_attempts:
+            raise error
+        return '7\n'
+
+    monkeypatch.setattr(common, 'get_active_jails', inventory)
+    monkeypatch.setattr(common, 'checkoutput', lookup)
+    monkeypatch.setattr(ioc.IOCage, 'list', lambda self, kind, uuid:
+                        ioc.ioc_list.IOCList.list_get_jid(uuid))
+    monkeypatch.setattr(ioc.ioc_stop, 'IOCStop', lambda name, *args, **kwargs:
+                        stop_attempts.append(name))
+    with pytest.raises(RuntimeError, match='jls'):
+        ioc.IOCage(jail='db').stop(parallel=True)
+
+    assert host.running['db']
+    assert stop_attempts == ([] if stage == 'preflight' else ['db'])
+
+
+@pytest.mark.parametrize('up', [False, True])
+def test_failed_named_jid_lookup_uses_checked_inventory(host, monkeypatch, up):
+    host.add('db.one', up=up)
+
+    def fail(command, **kwargs):
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(common, 'checkoutput', fail)
+    assert ioc.ioc_list.IOCList.list_get_jid('db.one') == (
+        up, '1' if up else '-'
+    )
 
 
 @pytest.mark.parametrize('rc', [False, True])
 @pytest.mark.parametrize('parallel', [False, True])
 def test_force_reaches_every_bulk_stop(host, rc, parallel):
-    add, _, calls, _, _ = host
-    add('a', boot=True, up=True)
-    add('b', boot=True, up=True)
+    host.add('a', boot=True, up=True)
+    host.add('b', boot=True, up=True)
     ioc.IOCage(jail=None if rc else 'ALL', rc=rc).stop(
         parallel=parallel, force=True
     )
-    assert len(calls) == 2
-    assert all(call[2]['force'] for call in calls)
+    assert len(host.calls) == 2
+    assert all(call[2]['force'] for call in host.calls)
 
 
 def test_parallel_stop_handles_name_containing_all(host):
-    add, running, calls, _, _ = host
-    add('SMALL', up=True)
-    add('other', up=True)
+    host.add('SMALL', up=True)
+    host.add('other', up=True)
     ioc.IOCage().stop(parallel=True, jails=['SMALL'])
-    assert [call[1] for call in calls] == ['SMALL']
-    assert running['other']
+    assert [call[1] for call in host.calls] == ['SMALL']
+    assert host.running['other']
 
 
 @pytest.mark.parametrize('action', ['start', 'stop'])
 @pytest.mark.parametrize('ignore', [False, True])
 def test_failure_reporting_and_ignore(host, action, ignore, caplog):
-    add, _, calls, hooks, _ = host
-    add('a', 10 if action == 'start' else 20, up=action == 'stop')
-    add('b', 20 if action == 'start' else 10, up=action == 'stop')
+    host.add('a', 10 if action == 'start' else 20, up=action == 'stop')
+    host.add('b', 20 if action == 'start' else 10, up=action == 'stop')
 
     def fail():
         raise SystemExit('broken hook')
 
-    hooks['a'] = fail
+    host.hooks['a'] = fail
     operate = getattr(ioc.IOCage(jail='ALL'), action)
 
     if ignore:
@@ -197,13 +261,12 @@ def test_failure_reporting_and_ignore(host, action, ignore, caplog):
             operate(parallel=True)
 
     expected = ['a', 'b'] if ignore or action == 'stop' else ['a']
-    assert [call[1] for call in calls] == expected
+    assert [call[1] for call in host.calls] == expected
 
 
 @pytest.mark.parametrize('action', ['start', 'stop'])
 def test_early_return_is_a_failure(host, monkeypatch, action):
-    add, _, _, _, _ = host
-    add('a', up=action == 'stop')
+    host.add('a', up=action == 'stop')
 
     if action == 'start':
         monkeypatch.setattr(ioc.IOCage, '__start_jail__',
@@ -218,27 +281,26 @@ def test_early_return_is_a_failure(host, monkeypatch, action):
 
 @pytest.mark.parametrize('problem', ['cycle', 'missing', 'priority'])
 def test_dependency_errors_are_fatal_even_with_ignore(host, problem):
-    add, _, calls, _, _ = host
-    add('a', depends={'cycle': 'a', 'missing': 'absent',
-                      'priority': 'b'}[problem])
+    dependency = {'cycle': 'a', 'missing': 'absent', 'priority': 'b'}[problem]
+    host.add('a', depends=dependency)
 
     if problem == 'priority':
-        add('b', priority=20)
+        host.add('b', priority=20)
 
     with pytest.raises(RuntimeError):
         ioc.IOCage(jail='a').start(parallel=True, ignore_exception=True)
 
-    assert calls == []
+    assert host.calls == []
 
 
 def test_callbacks_are_serialized_and_include_identity(host):
-    add, _, _, hooks, _ = host
-    add('a')
-    add('b')
-    add('c', priority=20)
-    add('d', priority=20)
+    host.add('a')
+    host.add('b')
+    host.add('c', priority=20)
+    host.add('d', priority=20)
     barrier = threading.Barrier(2)
-    hooks.update({name: lambda: barrier.wait(timeout=5) for name in 'abcd'})
+    for name in 'abcd':
+        host.hooks[name] = lambda: barrier.wait(timeout=5)
     active = 0
     messages = []
 
@@ -254,21 +316,21 @@ def test_callbacks_are_serialized_and_include_identity(host):
     assert sorted(messages) == [f'{name}: started' for name in 'abcd']
 
 
+@pytest.mark.parametrize('message', ['hook failed', 'a: hook failed'])
 def test_cli_worker_errors_keep_their_message_and_identity(
-    host, monkeypatch, caplog
+    host, monkeypatch, caplog, message
 ):
-    add, _, calls, hooks, _ = host
-    add('a')
-    add('b', priority=20)
+    host.add('a')
+    host.add('b', priority=20)
     monkeypatch.setattr(common, 'INTERACTIVE', True)
 
     def fail():
-        common.logit({'level': 'EXCEPTION', 'message': 'hook failed'})
+        common.logit({'level': 'EXCEPTION', 'message': message})
 
-    hooks['a'] = fail
+    host.hooks['a'] = fail
     result = CliRunner().invoke(load_cli('start'), ['--parallel', 'ALL'])
     assert result.exit_code == 1
-    assert [call[1] for call in calls] == ['a']
+    assert [call[1] for call in host.calls] == ['a']
     assert 'a: hook failed' in caplog.text
     assert 'a: 1' not in caplog.text
     assert 'a: a:' not in caplog.text
@@ -277,8 +339,7 @@ def test_cli_worker_errors_keep_their_message_and_identity(
 def test_parallel_log_context_does_not_change_sequential_errors(
     host, monkeypatch
 ):
-    add, _, _, _, _ = host
-    add('a')
+    host.add('a')
     ioc.IOCage(jail='a').start(parallel=True)
     monkeypatch.setattr(common, 'INTERACTIVE', True)
 
@@ -289,68 +350,173 @@ def test_parallel_log_context_does_not_change_sequential_errors(
 
 
 @pytest.mark.parametrize('conflict', ['pending', 'running', 'supplied'])
-def test_nat_conflicts_fail_before_lifecycle(host, conflict):
-    add, _, calls, _, _ = host
-    add('a', nat=True, forwards='tcp(80:8080)')
+@pytest.mark.parametrize('forwards', ['tcp(81:8080)', 'udp(8078-8080)'])
+def test_nat_conflicts_fail_before_lifecycle(host, conflict, forwards):
+    # Compare a single host port with the upper end of a range, including
+    # when one of the reservations came from a running jail or the caller.
+    host.add('a', nat=True, forwards=forwards, up=conflict == 'running')
 
     if conflict != 'supplied':
-        add('b', nat=True, forwards='tcp(81:8080)', up=conflict == 'running')
+        host.add('b', nat=True, forwards='tcp(80:8080)')
 
     with pytest.raises(RuntimeError, match='NAT forwarding ports conflict'):
         ioc.IOCage(jail='ALL').start(
             parallel=True, used_ports=[8080] if conflict == 'supplied' else None
         )
 
-    assert calls == []
+    assert host.calls == []
 
 
-def test_workers_receive_other_ports_and_same_address_reservations(host):
-    add, _, calls, _, _ = host
-    add('a', nat=True, forwards='tcp(80:8080)')
-    add('b', nat=True, forwards='tcp(81:8081)')
+def test_workers_receive_only_their_ports_and_share_address_reservations(
+    host, monkeypatch
+):
+    host.add('a', nat=True, forwards='tcp(80:8080)')
+    host.add('b', nat=True, forwards='tcp(8081-8083)')
+    peers = threading.Barrier(2)
+
+    def allocate():
+        common.gen_nat_ip('172.16', host.calls[0][2]['used_ips'])
+        peers.wait(timeout=5)
+
+    host.hooks['a'] = host.hooks['b'] = allocate
+    scan = mock.Mock(return_value=['172.16.0.2'])
+    monkeypatch.setattr(common, 'get_used_ips', scan)
+    monkeypatch.setattr(common, 'get_host_ips', lambda: [])
     ioc.IOCage(jail='ALL').start(parallel=True)
-    arguments = {name: kwargs for _, name, kwargs in calls}
-    assert arguments['a']['used_ports'] == {8081}
-    assert arguments['b']['used_ports'] == {8080}
+    arguments = {name: kwargs for _, name, kwargs in host.calls}
+    assert arguments['a']['reserved_ports'] == {8080}
+    assert arguments['b']['reserved_ports'] == {8081, 8082, 8083}
     assert arguments['a']['used_ips'] is arguments['b']['used_ips']
+    assert '172.16.0.2' in arguments['a']['used_ips']
+    assert scan.call_count == 2
+
+
+@pytest.mark.parametrize('priority', [10, 20])
+def test_later_start_sees_addresses_assigned_by_a_hook(host, monkeypatch,
+                                                       priority):
+    host.add('first')
+    host.add('second', priority=priority, nat=True, depends='first')
+    live = []
+    monkeypatch.setattr(common, 'get_used_ips', lambda: live.copy())
+    monkeypatch.setattr(common, 'get_host_ips', lambda: [])
+    host.hooks['first'] = lambda: live.append('172.16.0.1')
+    pairs = []
+
+    def allocate():
+        reservations = host.calls[-1][2]['used_ips']
+        pairs.append(common.gen_nat_ip('172.16', reservations))
+
+    host.hooks['second'] = allocate
+    assert ioc.IOCage(jail='ALL').start(parallel=True, jobs=1) == {}
+    assert pairs == [['172.16.0.5', '172.16.0.6']]
+
+
+def test_active_worker_refreshes_jail_ips_at_allocation(host, monkeypatch):
+    host.add('first')
+    host.add('waiting', nat=True)
+    live = []
+    monkeypatch.setattr(common, 'get_used_ips', lambda: live.copy())
+    address_ready = threading.Event()
+    allocated = threading.Event()
+    pairs = []
+
+    def assign():
+        live.append('172.16.0.1')
+        address_ready.set()
+        assert allocated.wait(timeout=5)
+
+    def allocate():
+        try:
+            assert address_ready.wait(timeout=5)
+            reservations = host.calls[0][2]['used_ips']
+            pairs.append(common.gen_nat_ip('172.16', reservations))
+        finally:
+            allocated.set()
+
+    # The first hook has assigned its address but cannot finish until the
+    # second worker makes its reservation.
+    host.hooks.update(first=assign, waiting=allocate)
+    assert ioc.IOCage(jail='ALL').start(parallel=True, jobs=2) == {}
+    assert pairs == [['172.16.0.5', '172.16.0.6']]
 
 
 def test_pending_static_addresses_are_reserved(host):
-    add, _, calls, _, configs = host
-    add('a')
-    add('b')
-    configs['b'].update({
-        'ip4_addr': 'lo0|172.16.0.1/32', 'localhost_ip': '127.0.0.2'
+    host.add('a')
+    host.add('b')
+    host.configs['b'].update({
+        'ip4_addr': 'lo0|172.16.0.1/32', 'assign_localhost': True,
+        'localhost_ip': '127.0.0.2'
     })
     ioc.IOCage(jail='ALL').start(parallel=True)
-    assert calls[0][2]['used_ips'] == {'172.16.0.1', '127.0.0.2'}
+    assert host.calls[0][2]['used_ips'] == {'172.16.0.1', '127.0.0.2'}
+
+
+@pytest.mark.parametrize('rc', [False, True])
+def test_bulk_start_with_disabled_thick_vnet_localhost(host, rc):
+    host.add('vnet', boot=True)
+    host.add('other', boot=True)
+    host.configs['vnet'].update(vnet=1, assign_localhost=0, localhost_ip=0)
+    ioc.IOCage(rc=rc, jail=None if rc else 'ALL').start(parallel=True)
+    assert all(host.running.values())
 
 
 def test_silent_without_consumer_callback_stays_silent(host, caplog):
-    add, _, _, _, _ = host
-    add('a', boot=True)
+    host.add('a', boot=True)
     caplog.set_level(logging.INFO, logger='iocage')
     ioc.IOCage(rc=True, silent=True).start(parallel=True)
     assert caplog.records == []
 
 
 def test_empty_boot_selection_succeeds(host):
-    add, _, calls, _, _ = host
-    add('a', boot=False)
+    host.add('a', boot=False)
     assert ioc.IOCage(rc=True).start(parallel=True) == {}
-    assert calls == []
+    assert host.calls == []
+
+
+@pytest.mark.parametrize('rc', [False, True])
+def test_bulk_start_skips_unsupported_inventory(host, rc, caplog):
+    host.add('unsupported', boot=True)
+    host.configs['unsupported']['type'] = 'unknown'
+    host.add('healthy', boot=True)
+    parent = ioc.IOCage(jail=None if rc else 'ALL', rc=rc, silent=rc)
+    assert parent.start(parallel=True) == {}
+    assert 'Skipping unsupported:' in caplog.text
+    assert [name for _, name, _ in host.calls] == ['healthy']
+    assert host.running == {'unsupported': False, 'healthy': True}
+
+
+@pytest.mark.parametrize('selection', ['explicit', 'dependency'])
+def test_unsupported_start_request_fails_preflight(host, selection):
+    host.add('unsupported')
+    host.configs['unsupported']['type'] = 'unknown'
+    host.add('healthy', depends='unsupported')
+    target = 'unsupported' if selection == 'explicit' else 'ALL'
+    with pytest.raises(RuntimeError, match='unknown is not a supported'):
+        ioc.IOCage(jail=target).start(parallel=True)
+    assert host.calls == []
+
+
+@pytest.mark.parametrize('action', ['start', 'stop'])
+def test_singular_jail_cannot_widen_parallel_selection(host, action):
+    host.add('alpha', up=action == 'stop')
+    host.add('beta', up=action == 'stop')
+    operate = getattr(ioc.IOCage(jail='ALL'), action)
+
+    with pytest.raises(ValueError, match='Use jails='):
+        operate(jail='alpha', parallel=True)
+
+    assert host.calls == []
 
 
 @pytest.mark.parametrize('rc', [False, True])
 def test_bulk_start_skips_templates(host, rc):
-    add, running, calls, _, configs = host
-    add('a', boot=True)
-    add('template', boot=True)
-    configs['template']['type'] = 'template'
+    host.add('a', boot=True)
+    host.add('template', boot=True)
+    host.configs['template']['type'] = 'template'
     parent = ioc.IOCage(rc=True) if rc else ioc.IOCage(jail='ALL')
     assert parent.start(parallel=True) == {}
-    assert [call[1] for call in calls] == ['a']
-    assert running == {'a': True, 'template': False}
+    assert [call[1] for call in host.calls] == ['a']
+    assert host.running == {'a': True, 'template': False}
 
 
 @pytest.mark.parametrize('action', ['start', 'stop'])
@@ -358,8 +524,7 @@ def test_bulk_start_skips_templates(host, rc):
 def test_bulk_selection_can_load_a_skipped_inventory(
     host, monkeypatch, action, rc
 ):
-    add, running, calls, _, configs = host
-    add('a', boot=True, up=action == 'stop')
+    host.add('a', boot=True, up=action == 'stop')
     parent = ioc.IOCage(jail=None if rc else 'ALL', rc=rc, skip_jails=True)
     del parent.jails  # Match the real constructor's lazy-inventory path.
     list_jail = ioc.IOCage.list
@@ -368,41 +533,39 @@ def test_bulk_selection_can_load_a_skipped_inventory(
     def list_host(self, kind, **kwargs):
         if kind == 'uuid':
             inventories.append(kind)
-            return {name: name for name in configs}
+            return {name: name for name in host.configs}
 
         return list_jail(self, kind, **kwargs)
 
     monkeypatch.setattr(ioc.IOCage, 'list', list_host)
     assert getattr(parent, action)(parallel=True) == {}
     assert inventories == ['uuid']
-    assert len(calls) == 1
-    assert running['a'] == (action == 'start')
+    assert len(host.calls) == 1
+    assert host.running['a'] == (action == 'start')
 
 
 @pytest.mark.parametrize('dependency', [False, True])
 def test_explicit_template_start_still_fails_preflight(host, dependency):
-    add, _, calls, _, configs = host
-    add('template')
-    configs['template']['type'] = 'template'
+    host.add('template')
+    host.configs['template']['type'] = 'template'
     selected = 'template'
 
     if dependency:
-        add('a', depends='template')
+        host.add('a', depends='template')
         selected = 'a'
 
     with pytest.raises(RuntimeError, match='convert back to a jail'):
         ioc.IOCage(jail=selected).start(parallel=True)
 
-    assert calls == []
+    assert host.calls == []
 
 
 @pytest.mark.parametrize('action', ['start', 'stop'])
 def test_sequential_named_jail_keeps_existing_path(host, action):
-    add, running, calls, _, _ = host
-    add('a', up=action == 'stop')
+    host.add('a', up=action == 'stop')
     getattr(ioc.IOCage(jail='a'), action)()
-    assert len(calls) == 1
-    assert running['a'] == (action == 'start')
+    assert len(host.calls) == 1
+    assert host.running['a'] == (action == 'start')
 
 
 def load_cli(action):
@@ -424,17 +587,16 @@ def load_cli(action):
 def test_cli_rejects_invalid_combinations(host, action, arguments):
     result = CliRunner().invoke(load_cli(action), arguments)
     assert result.exit_code == 2
-    assert host[2] == []
+    assert host.calls == []
 
 
 @pytest.mark.parametrize('action', ['start', 'stop'])
 def test_cli_parallel_dispatch(host, action):
-    add, running, calls, _, _ = host
-    add('a', up=action == 'stop')
-    add('b', up=action == 'stop')
+    host.add('a', up=action == 'stop')
+    host.add('b', up=action == 'stop')
     result = CliRunner().invoke(
         load_cli(action), ['--parallel', '--jobs', '1', 'b', 'a']
     )
     assert result.exit_code == 0, result.exception
-    assert len(calls) == 2
-    assert all(state == (action == 'start') for state in running.values())
+    assert len(host.calls) == 2
+    assert all(state == (action == 'start') for state in host.running.values())
